@@ -32,11 +32,26 @@ npx serve .
 La conexión usa el servidor de señalización público de PeerJS solo para el encuentro inicial; después los datos
 van directo entre los dos navegadores. Lee [Limitaciones y riesgos](#limitaciones-y-riesgos) antes de compartirlo.
 
-## Efectos (en desarrollo)
+## Efectos
 
 En el menú se elige el modo de efectos: **Sin efectos** (por defecto), **Solo power-ups**, **Solo eventos** o **Todo**.
-Se aplica a la partida contra la máquina y, en línea, lo decide quien crea la sala. Por ahora solo existe el sistema;
-los efectos concretos (orbes de power-up y eventos de mesa) llegan en las siguientes fases.
+Se aplica a la partida contra la máquina y, en línea, lo decide quien crea la sala. Los eventos de mesa llegan en la
+siguiente fase; por ahora "Solo eventos" no cambia nada.
+
+### Power-ups (orbes)
+
+De vez en cuando (no antes de 6 s de partida, al menos 14 s entre uno y otro, y luego un 10 % de probabilidad por
+segundo) aparece un orbe flotando sobre la mesa durante 10 s. **Lo recoge quien haga pasar la pelota por él** (el
+último que la golpeó); el orbe no desvía la pelota.
+
+| Orbe | Efecto | Para quién | Duración |
+|---|---|---|---|
+| 🏓 Paleta grande (verde) | Alcance de la paleta ×1.5 (la paleta y el aro guía se ven más grandes) | Quien lo recoge | 8 s |
+| ⚡ Pelota rápida (amarillo) | Su siguiente devolución tarda 0.7 de lo normal en llegar | Quien lo recoge | 1 golpe |
+| ❄ Congelado (azul) | La paleta del rival se mueve a 0.6 m/s como máximo y se tiñe de azul | El rival de quien lo recoge | 3 s |
+
+La máquina también los recoge (según la dificultad, a veces apunta su devolución para que pase por el orbe) y los
+sufre igual que tú. La guía sigue siendo exacta: usa la misma física que la pelota.
 
 - Todos los parámetros de juego se leen de **parámetros efectivos**: `P` (mundo, mesa, saque, golpes e IA, en
   `physics.js`) y `PP[i]` (por jugador: alcance, rapidez de sus devoluciones y tope de velocidad de su paleta, en
@@ -74,6 +89,15 @@ Los parámetros del saque (`t1 = 0.26`, `z1 = 0.65`, altura `SERVE_Y = 1.2`) est
 - El saque de un jugador remoto solo lo dispara su propia entrada; la máquina saca sola desde cualquier lado.
 - Una partida máquina contra máquina termina con un marcador válido.
 
+`test/physics.test.js` además barre **todas las combinaciones de power-ups** del registro: devoluciones de ambos lados con
+cada combinación de quien golpea y saques con cada alcance de quien recibe; y comprueba que la pelota rápida de verdad
+llega antes (como mucho 0.83 del tiempo normal, aun subiendo el arco para pasar la red).
+
+`test/powerups.test.js` prueba el orbe (primer retraso, vida, separación mínima, posición sobre la mesa, sin orbes ni
+azar extra cuando el modo no los permite), la recogida y quién recibe cada efecto, la paleta grande, la pelota rápida,
+el congelado en humano y máquina, que la máquina recoge orbes y termina partidas válidas, y que la guía coincide con el
+vuelo real con efectos activos.
+
 `test/effects.test.js` prueba el sistema de efectos con efectos de prueba: validación del registro, valores por defecto
 exactos sin efectos, duraciones en segundos, golpes y puntos, composición y renovación, filtro por modo, que en una
 partida la mesa solo cambie entre puntos, el bloqueo del saque durante la animación, el tope de velocidad, y la carga
@@ -87,6 +111,7 @@ saneada de la lista recibida por red.
 | `style.css` | Estilos. |
 | `src/physics.js` | Parámetros efectivos `P` (y sus `DEFAULTS`), `launchTo`, `serveVel`, `predict` y el paso de simulación (red, mesa, plano de golpeo). Sin DOM ni Three. |
 | `src/effects.js` | Sistema de efectos: registro, efectos activos y pendientes, duraciones, cálculo de `P` y `PP[i]`, y lista para la red. |
+| `src/powerups.js` | Los tres power-ups y el orbe: aparición, vida y detección de la pelota que pasa por él. |
 | `src/game.js` | Estado de la partida, reglas, golpes, saque y puntos. Dos jugadores simétricos (`PL[0]` en z > 0, `PL[1]` en z < 0) con control `local`, `ia` o `remoto`. Sin DOM: avisa a la interfaz mediante `out`. |
 | `src/ai.js` | Dificultades y comportamiento de la máquina (para cualquier lado de la mesa). |
 | `src/render.js` | Escena Three.js (girada 180° para el jugador 1) y proyección del puntero al plano de la paleta. |

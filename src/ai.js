@@ -4,10 +4,11 @@ import { P, predict } from "./physics.js";
 import { PP } from "./effects.js";
 import { clamp, rnd } from "./util.js";
 
+// orb: probabilidad de apuntar su devolución a través de un orbe de power-up, si hay uno en el camino.
 export var DIFF = {
-  facil:   { label: "Fácil",   speed: 2.1, react: 0.22, err: 0.30, fault: 0.22, pmin: 0.25, pmax: 0.6 },
-  medio:   { label: "Medio",   speed: 3.0, react: 0.14, err: 0.17, fault: 0.10, pmin: 0.4,  pmax: 0.85 },
-  dificil: { label: "Difícil", speed: 4.2, react: 0.08, err: 0.08, fault: 0.04, pmin: 0.55, pmax: 1.0 }
+  facil:   { label: "Fácil",   speed: 2.1, react: 0.22, err: 0.30, fault: 0.22, pmin: 0.25, pmax: 0.6,  orb: 0.3 },
+  medio:   { label: "Medio",   speed: 3.0, react: 0.14, err: 0.17, fault: 0.10, pmin: 0.4,  pmax: 0.85, orb: 0.5 },
+  dificil: { label: "Difícil", speed: 4.2, react: 0.08, err: 0.08, fault: 0.04, pmin: 0.55, pmax: 1.0,  orb: 0.7 }
 };
 
 // Error de puntería al empezar un punto.
@@ -21,11 +22,17 @@ export function aiOnOpponentHit(pl, diff) {
 
 // Elige el golpe: devuelve {power, tx, tz} (objetivo en la mesa del rival).
 // Apunta en x lejos del rival (simétrico en x para ambos lados); tz va hacia el lado contrario.
-export function aiShot(pl, diff, oppX) {
+// x0: x donde golpea; orb: orbe de power-up o null. En planta la pelota va en línea recta, así que, si el orbe
+// está entre la paleta y el objetivo, puede elegir tx para que la trayectoria pase por su x (la altura no la controla).
+export function aiShot(pl, diff, oppX, x0, orb) {
   var D = DIFF[diff];
   var power = D.pmin + Math.random() * (D.pmax - D.pmin);
   var tx = clamp(-0.5 * oppX + rnd() * 0.45, -P.AI_AIM_X, P.AI_AIM_X);
   var tz = -pl.side * (P.DEPTH_MIN + P.DEPTH_RANGE * power);
+  if (orb) {
+    var z0 = pl.side * P.PZ, f = (tz - z0) / (orb.z - z0);
+    if (f > 1 && Math.random() < D.orb) tx = clamp(x0 + (orb.x - x0) * f, -P.AI_AIM_X, P.AI_AIM_X);
+  }
   if (Math.random() < D.fault) {
     if (Math.random() < 0.5) tz = -pl.side * P.AI_FAULT_Z; else tx = (Math.random() < 0.5 ? -1 : 1) * P.AI_FAULT_X;
   }

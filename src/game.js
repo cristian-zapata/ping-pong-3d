@@ -9,13 +9,16 @@ import {
 import { clamp, rnd } from "./util.js";
 import { aiNewPoint, aiOnOpponentHit, aiShot, aiServeX, updateAI } from "./ai.js";
 import * as fx from "./effects.js";
+import { ORB, orbStep, orbTouched } from "./powerups.js";
 
 // ---------- Estado ----------
 // me: índice del jugador que ve esta pantalla. msg: descriptor del mensaje actual (ver texts.js).
 // online: partida en línea (sin pausa). fxMode: modo de efectos ("off" | "powerups" | "events" | "all").
 // lock: segundos en que no se puede sacar porque la mesa acaba de cambiar (dura lo que su animación).
+// orb: orbe de power-up flotando (null o { kind, x, y, z, life }); orbWait: s hasta que pueda aparecer otro.
 export var S = { mode: "menu", prev: null, diff: "medio", score: [0, 0], me: 0, base: 0, server: 0, timer: 0,
-                 pending: null, wins: 0, losses: 0, guide: true, msg: null, online: false, fxMode: "off", lock: 0 };
+                 pending: null, wins: 0, losses: 0, guide: true, msg: null, online: false, fxMode: "off", lock: 0,
+                 orb: null, orbWait: 0 };
 export var TABLE_ANIM = fx.TABLE_ANIM;
 export var B = { x: 0, y: 1, z: 1.45, vx: 0, vy: 0, vz: 0, hitter: 0, need: "opp", live: false };
 
@@ -29,7 +32,7 @@ export var out = {
   msg: function () {},        // msg(descriptor | null)
   hud: function () {},        // hud()
   overlay: function () {},    // overlay(tipo, gano) · overlay(null) la oculta
-  sound: function () {},      // sound("hit", potencia) · ("bounce") · ("net") · ("point", ganador)
+  sound: function () {},      // sound("hit", potencia) · ("bounce") · ("net") · ("point", ganador) · ("orb")
   notice: function () {}      // notice({ k: "fx-on" | "fx-off", id, o }) al empezar o terminar un efecto
 };
 fx.onNotice(function (ev) { out.notice(ev); });
@@ -74,6 +77,7 @@ function onBounce(s) {
 export function newGame() {
   S.score[0] = 0; S.score[1] = 0; S.pending = null;
   fx.clear();
+  S.orb = null; S.orbWait = ORB.FIRST;
   S.base = 1 - S.base;
   out.overlay(null);
   startPoint();
@@ -108,7 +112,7 @@ export function togglePause() {
 }
 
 export function toMenu() {
-  S.mode = "menu"; B.live = false; fx.clear(); say(null); out.hud(); out.overlay("menu");
+  S.mode = "menu"; B.live = false; fx.clear(); S.orb = null; say(null); out.hud(); out.overlay("menu");
 }
 
 export function setDiff(d) { S.diff = d; out.overlay("menu"); }
@@ -135,7 +139,7 @@ function launchBall(x, y, z, Tx, Tz, tDes, hitter) {
 function hit(i, xx, yy) {
   var pl = PL[i], s = pl.side, opp = PL[1 - i], power, tx, tz;
   if (pl.ctrl === "ia") {
-    var shot = aiShot(pl, S.diff, opp.x);
+    var shot = aiShot(pl, S.diff, opp.x, xx, S.orb);
     power = shot.power; tx = shot.tx; tz = shot.tz;
   } else {
     // Golpe humano, calculado en el marco de quien golpea (x' = s·x, z' = s·z):
@@ -166,6 +170,14 @@ function doServe(i) {
   out.sound("hit", 0.4);
 }
 
+// El jugador i hizo pasar la pelota por el orbe: lo recoge. El efecto va a él o a su rival según el power-up.
+function collectOrb(i) {
+  var kind = S.orb.kind, def = fx.getDef(kind);
+  S.orb = null; S.orbWait = ORB.GAP;
+  out.sound("orb");
+  giveEffect(kind, def.target === "rival" ? 1 - i : i);
+}
+
 // Clic/espacio del jugador i (local o remoto): saca si le toca, si no inicia un golpe fuerte.
 export function trySwing(i) {
   var pl = PL[i];
@@ -193,6 +205,9 @@ function stepBall(h) {
     out.sound("bounce");
     if (onBounce(sideOf(b.z))) return;
   }
+
+  // orbe: lo recoge quien golpeó la pelota que pasa por él (no la desvía)
+  if (S.orb && orbTouched(S.orb, ox, oy, oz, b)) collectOrb(b.hitter);
 
   // paleta del receptor (solo cuando ya botó en su lado)
   if (b.need === "done") {
@@ -232,6 +247,7 @@ export function tick(h) {
   if (S.mode === "serve" || S.mode === "play" || S.mode === "point") {
     PL.forEach(function (pl) { if (pl.ctrl === "ia") updateAI(pl, h, S, B); });
     fx.onSeconds(h);
+    if (fx.allowedIn({ cat: "powerup" }, S.fxMode)) orbStep(S, h);
   }
 
   if (S.mode === "serve") {

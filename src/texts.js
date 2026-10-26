@@ -31,6 +31,9 @@ export function fxText(ev, me, rivalAI) {
   var def = getDef(ev.id);
   if (!def) return "";
   var R = rivalAI ? "La máquina" : "Tu rival", r = rivalAI ? "la máquina" : "tu rival", on = ev.k === "fx-on";
+  if (def.say && ev.o !== -1) {
+    return def.say[on ? "on" : "off"][ev.o === me ? 0 : 1].replace("{R}", R).replace("{r}", r);
+  }
   if (ev.o === -1) return on ? "Evento: " + def.name + " (" + leftText(def, def.n) + ")" : "Termina el evento: " + def.name;
   if (ev.o === me) return on ? "¡" + def.name + "!" + (def.desc ? " " + def.desc : "") : "Se acabó tu " + def.name;
   return on ? R + " consiguió " + def.name : "Se acabó " + def.name + " de " + r;

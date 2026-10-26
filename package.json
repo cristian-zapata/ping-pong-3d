@@ -5,7 +5,7 @@
   "description": "Ping-pong 3D en el navegador (Three.js por CDN, sin build).",
   "type": "module",
   "scripts": {
-    "test": "node --test test/physics.test.js test/game.test.js test/effects.test.js"
+    "test": "node --test test/physics.test.js test/game.test.js test/effects.test.js test/powerups.test.js"
   },
   "engines": {
     "node": ">=20"

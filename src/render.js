@@ -1,6 +1,7 @@
 // Escena Three.js. Three se carga como script clásico (global THREE) desde index.html.
 import { P, DEFAULTS, predict } from "./physics.js";
-import { PP, FX, TABLE_ANIM } from "./effects.js";
+import { PP, FX, TABLE_ANIM, getDef } from "./effects.js";
+import { ORB } from "./powerups.js";
 import { clamp } from "./util.js";
 
 // Devuelve { render(S, B, PL, me), project(nx, ny, planeZ) } o null si no hay Three/WebGL.
@@ -101,6 +102,29 @@ export function createRenderer(canvas, stage) {
   }
   var myPaddle = makePaddle(0xe03045, 0xffd3d9, 0.8);   // la de quien mira (semitransparente)
   var rivalPaddle = makePaddle(0x15151d, 0xd9dde8, 1);
+  myPaddle.userData.color = 0xe03045; rivalPaddle.userData.color = 0x15151d;
+
+  // orbe de power-up: esfera translúcida del color del efecto, con su icono dentro (sprite dibujado en un canvas)
+  var orbGroup = new THREE.Group();
+  var orbShell = new THREE.Mesh(new THREE.SphereGeometry(ORB.R, 24, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false }));
+  orbGroup.add(orbShell);
+  orbGroup.visible = false; world.add(orbGroup);
+  var orbIcons = {}, orbIcon = null;
+  function iconSprite(kind) {
+    if (orbIcons[kind]) return orbIcons[kind];
+    var def = getDef(kind), c = document.createElement("canvas");
+    c.width = c.height = 128;
+    var g = c.getContext("2d");
+    g.fillStyle = def.color; g.beginPath(); g.arc(64, 64, 58, 0, Math.PI * 2); g.fill();
+    g.lineWidth = 8; g.strokeStyle = "#ffffff"; g.stroke();
+    g.font = "64px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#14182c";
+    g.fillText(def.icon, 64, 70);
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthWrite: false }));
+    sp.scale.setScalar(ORB.R * 1.25);
+    orbIcons[kind] = sp;
+    return sp;
+  }
 
   // rival
   var rival = new THREE.Group();
@@ -138,6 +162,8 @@ export function createRenderer(canvas, stage) {
     mesh.position.set(pl.x, pl.y, s * (P.PZ - sf * 0.28));
     mesh.rotation.set(-s * sf * 0.9, 0, pl.ctrl === "ia" ? -pl.x * 0.1 : -pl.vx * 0.05);
     mesh.scale.setScalar(reachScale(pl.i));
+    // congelado (tope de velocidad): la pala se tiñe de azul hielo
+    mesh.children[0].material.color.setHex(PP[pl.i].speedCap < Infinity ? 0x8fd3ff : mesh.userData.color);
     return sf;
   }
 
@@ -175,6 +201,16 @@ export function createRenderer(canvas, stage) {
     rival.position.set(other.x * 0.55, 0, os * 2.4);
     rival.rotation.y = os > 0 ? Math.PI : 0;
     link(arm, rival.position.x - os * 0.22, 1.2, rival.position.z - os * 0.05, other.x, other.y - 0.05, os * (P.PZ - sa * 0.28));
+
+    // orbe: flota con un leve vaivén (solo visual; la recogida usa su posición exacta)
+    if (S.orb && S.mode !== "menu" && S.mode !== "over") {
+      var icon = iconSprite(S.orb.kind);
+      if (icon !== orbIcon) { if (orbIcon) orbGroup.remove(orbIcon); orbGroup.add(icon); orbIcon = icon; }
+      orbShell.material.color.set(getDef(S.orb.kind).color);
+      orbShell.material.opacity = 0.28 + 0.1 * Math.sin(t * 4);
+      orbGroup.position.set(S.orb.x, S.orb.y + 0.015 * Math.sin(t * 2.5), S.orb.z);
+      orbGroup.visible = true;
+    } else orbGroup.visible = false;
 
     // guía: dónde cruzará la pelota el plano de golpeo de quien mira
     var showGuide = false, pz = mine.side * P.PZ;

@@ -4,20 +4,22 @@
 // Mensajes (JSON):
 //   invitado -> anfitrión  rt:  { t:"in", q, x, y, sw }      objetivo de su paleta (mundo) y contador de golpes
 //   anfitrión -> invitado  rt:  { t:"st", q, m, sc, sv, msg, b:[x,y,z,vx,vy,vz,viva,golpeador], p:[x0,y0,vx0,sw0,x1,y1,vx1,sw1],
-//                                fm: modo de efectos, fx: [[uid, id, dueño, restante], ...] }   (solo el anfitrión activa efectos)
+//                                fm: modo de efectos, fx: [[uid, id, dueño, restante], ...],   (solo el anfitrión activa efectos)
+//                                ob: orbe [tipo, x, y, z] o null }
 //                          ctl: { t:"ev", e, a }              sonidos
 //   ambos                  rt:  { t:"ping", ts } / { t:"pong", ts }
 //                          ctl: { t:"revancha" } · { t:"adios" }
 import * as net from "./net.js";
 import { P, integrate, hitsNet, netDeflect, onTable, bounceTable, bounceFloor } from "./physics.js";
 import * as fx from "./effects.js";
+import { isOrbKind } from "./powerups.js";
 import { S, B, PL, out, setControls, newGame, trySwing, moveHuman, toMenu } from "./game.js";
 import { clamp } from "./util.js";
 import { playSound } from "./audio.js";
 import * as ui from "./ui.js";
 
 var SNAP_DT = 1 / 30, INPUT_DT = 1 / 40, PING_DT = 1, TIMEOUT_MS = 6000, MAX_MSGS_PER_S = 150, STEP = 1 / 120;
-var MODES = ["serve", "play", "point", "over"], WHY = ["net", "out", "own", "miss"], SOUNDS = ["hit", "bounce", "net", "point"];
+var MODES = ["serve", "play", "point", "over"], WHY = ["net", "out", "own", "miss"], SOUNDS = ["hit", "bounce", "net", "point", "orb"];
 
 var role = null;            // null | "host" | "guest"
 var gen = 0;                // sube en cada intento: descarta resultados de intentos cancelados
@@ -103,7 +105,7 @@ function endOnline() {
   role = null; connected = false; gen++;
   net.cerrar();
   S.online = false;
-  fx.clear();
+  fx.clear(); S.orb = null;
   setControls("local", "ia", 0);
   ui.setOnline(false);
 }
@@ -195,6 +197,8 @@ function guestSnapshot(m) {
   // Efectos: el invitado solo carga lo que decide el anfitrión (recalcula P/PP para dibujar y extrapolar).
   if (fx.MODES[m.fm]) S.fxMode = m.fm;
   fx.load(m.fx);
+  S.orb = Array.isArray(m.ob) && m.ob.length === 4 && isOrbKind(m.ob[0]) && numArray(m.ob.slice(1), 3)
+    ? { kind: m.ob[0], x: clamp(m.ob[1], -2, 2), y: clamp(m.ob[2], 0, 3), z: clamp(m.ob[3], -2, 2), life: 1 } : null;
 
   var d = sanitizeMsg(m.msg);
   if (JSON.stringify(d) !== JSON.stringify(S.msg)) { S.msg = d; out.msg(d); }
@@ -283,6 +287,7 @@ function sendSnapshot() {
   var a = PL[0], b = PL[1];
   net.enviar({
     t: "st", q: ++snapQ, m: S.mode, sc: [S.score[0], S.score[1]], sv: S.server, msg: S.msg, fm: S.fxMode, fx: fx.snapshot(),
+    ob: S.orb ? [S.orb.kind, r4(S.orb.x), r4(S.orb.y), r4(S.orb.z)] : null,
     b: [r4(B.x), r4(B.y), r4(B.z), r4(B.vx), r4(B.vy), r4(B.vz), B.live ? 1 : 0, B.hitter],
     p: [r4(a.x), r4(a.y), r4(a.vx), r4(a.swing), r4(b.x), r4(b.y), r4(b.vx), r4(b.swing)]
   }, false);
