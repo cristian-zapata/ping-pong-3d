@@ -1,6 +1,7 @@
 // Teclado, puntero (mouse/táctil) y gamepad. Mueve el objetivo de la paleta (paddle.tx/ty) y dispara acciones.
 // paddle.tx está en el marco de quien mira (x a su derecha); main.js lo pasa al mundo.
 import { clamp } from "./util.js";
+import { P } from "./physics.js";
 import { overlayOpen, clickPrimary } from "./ui.js";
 import { unlockAudio } from "./audio.js";
 
@@ -41,18 +42,18 @@ function pointerPos(e) {
   // proyecta el cursor al plano de tu paleta para que quede justo debajo del puntero
   var p = cfg.project(nx, ny);
   if (!p) return;
-  cfg.paddle.tx = clamp(p.x, -1.1, 1.1);
-  cfg.paddle.ty = clamp(p.y, 0.75, 1.75);
+  cfg.paddle.tx = clamp(p.x, -P.PAD_X, P.PAD_X);
+  cfg.paddle.ty = clamp(p.y, P.PAD_YMIN, P.PAD_YMAX);
 }
 
 function readGamepad(h) {
-  var P = cfg.paddle;
+  var pad = cfg.paddle;
   var pads = navigator.getGamepads ? navigator.getGamepads() : [], a = false, i;
   for (i = 0; i < pads.length; i++) {
     var g = pads[i]; if (!g) continue;
     var ax = g.axes[0] || 0, ay = g.axes[1] || 0;
-    if (Math.abs(ax) > 0.15) P.tx = clamp(P.tx + ax * 2.4 * h, -1.1, 1.1);
-    if (Math.abs(ay) > 0.15) P.ty = clamp(P.ty - ay * 1.6 * h, 0.75, 1.75);
+    if (Math.abs(ax) > 0.15) pad.tx = clamp(pad.tx + ax * 2.4 * h, -P.PAD_X, P.PAD_X);
+    if (Math.abs(ay) > 0.15) pad.ty = clamp(pad.ty - ay * 1.6 * h, P.PAD_YMIN, P.PAD_YMAX);
     if (g.buttons[0] && g.buttons[0].pressed) a = true;
   }
   if (a && !gpPrevA) {
@@ -64,15 +65,15 @@ function readGamepad(h) {
 
 // Se llama en cada paso lógico, antes de game.tick(h).
 export function pollInput(h) {
-  var P = cfg.paddle;
+  var pad = cfg.paddle;
   var dx = 0, dy = 0;
   if (keys["a"] || keys["arrowleft"]) dx -= 1;
   if (keys["d"] || keys["arrowright"]) dx += 1;
   if (keys["w"] || keys["arrowup"]) dy += 1;
   if (keys["s"] || keys["arrowdown"]) dy -= 1;
-  P.tx = clamp(P.tx + dx * 2.4 * h, -1.1, 1.1);
-  P.ty = clamp(P.ty + dy * 1.6 * h, 0.75, 1.75);
+  pad.tx = clamp(pad.tx + dx * 2.4 * h, -P.PAD_X, P.PAD_X);
+  pad.ty = clamp(pad.ty + dy * 1.6 * h, P.PAD_YMIN, P.PAD_YMAX);
   readGamepad(h);
-  P.tx = clamp(P.tx, -1.1, 1.1);
-  P.ty = clamp(P.ty, 0.75, 1.75);
+  pad.tx = clamp(pad.tx, -P.PAD_X, P.PAD_X);
+  pad.ty = clamp(pad.ty, P.PAD_YMIN, P.PAD_YMAX);
 }

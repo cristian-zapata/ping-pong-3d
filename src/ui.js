@@ -2,6 +2,8 @@
 // Todo texto variable (códigos, estados de red) se escribe con textContent, nunca como HTML.
 import { DIFF } from "./ai.js";
 import { unlockAudio } from "./audio.js";
+import { MODES, getDef, registeredIds } from "./effects.js";
+import { leftText } from "./texts.js";
 
 var ov = document.getElementById("ov");
 var msgEl = document.getElementById("msg");
@@ -55,9 +57,16 @@ export function showOverlay(kind, S, extra) {
     var segs = Object.keys(DIFF).map(function (k) {
       return '<button type="button" role="radio" data-a="diff" data-v="' + k + '" aria-checked="' + (S.diff === k) + '">' + DIFF[k].label + "</button>";
     }).join("");
+    var fxSegs = Object.keys(MODES).map(function (k) {
+      return '<button type="button" role="radio" data-a="fxmode" data-v="' + k + '" aria-checked="' + (S.fxMode === k) + '">' + MODES[k].label + "</button>";
+    }).join("");
     html = '<div class="card"><h2>Ping-pong 3D</h2>' +
       "<p>Juega contra la máquina o contra un amigo en línea. Gana quien llegue primero a 11 puntos con 2 de diferencia.</p>" +
-      '<div class="seg" role="radiogroup" aria-label="Dificultad">' + segs + "</div><br>" +
+      '<div class="seg-label">Dificultad de la máquina</div>' +
+      '<div class="seg" role="radiogroup" aria-label="Dificultad">' + segs + "</div>" +
+      '<div class="seg-label">Efectos (contra la máquina o al crear sala)</div>' +
+      '<div class="seg seg-wrap" role="radiogroup" aria-label="Efectos">' + fxSegs + "</div>" +
+      (registeredIds().length ? "" : '<p class="hint fx-none">Todavía no hay efectos disponibles: llegan en la próxima versión.</p>') + "<br>" +
       '<button type="button" class="btn primary" data-a="start">Contra la máquina</button>' +
       '<div class="row"><button type="button" class="btn ghost" data-a="host">Crear sala</button>' +
       '<button type="button" class="btn ghost" data-a="join">Unirse a sala</button></div>' +
@@ -84,6 +93,7 @@ export function showOverlay(kind, S, extra) {
   } else if (kind === "hosting") {
     html = '<div class="card"><h2>Sala creada</h2><p>Comparte este código con tu rival:</p>' +
       '<div class="code" id="roomCode"></div><p id="ovStatus">Esperando jugador…</p>' +
+      '<p class="hint">Efectos: ' + MODES[S.fxMode].label + "</p>" +
       '<button type="button" class="btn ghost" data-a="copy">Copiar código</button>' +
       '<button type="button" class="btn ghost" data-a="leave">Cancelar</button></div>';
   } else if (kind === "connecting") {
@@ -119,4 +129,47 @@ export function onOverlayAction(fn) {
     unlockAudio();
     fn(el.getAttribute("data-a"), el.getAttribute("data-v"));
   });
+}
+
+// ---------- Efectos: chips con icono y tiempo restante, y avisos ----------
+var fxSig = "";
+// list: efectos activos [{ uid, id, owner, left }]. Los del jugador `me` van abajo a la izquierda,
+// los del rival arriba a la derecha y los globales/de mesa arriba a la izquierda.
+export function updateFx(list, me) {
+  var groups = { fxMe: [], fxThem: [], fxAll: [] };
+  list.forEach(function (e) {
+    var def = getDef(e.id);
+    if (!def) return;
+    var g = e.owner === -1 ? "fxAll" : (e.owner === me ? "fxMe" : "fxThem");
+    groups[g].push({ def: def, left: leftText(def, e.left) });
+  });
+  var sig = JSON.stringify(Object.keys(groups).map(function (g) { return groups[g].map(function (c) { return c.def.id + c.left; }); }));
+  if (sig === fxSig) return;
+  fxSig = sig;
+  Object.keys(groups).forEach(function (g) {
+    var box = $(g);
+    box.textContent = "";
+    groups[g].forEach(function (c) {
+      var chip = document.createElement("span");
+      chip.className = "fx-chip";
+      chip.style.setProperty("--fx", c.def.color);
+      chip.title = c.def.name;
+      var ic = document.createElement("b"); ic.textContent = c.def.icon;
+      var tx = document.createElement("span"); tx.textContent = c.def.name + " · " + c.left;
+      chip.appendChild(ic); chip.appendChild(tx);
+      box.appendChild(chip);
+    });
+  });
+}
+
+// Aviso breve bajo el mensaje principal (máximo 3 a la vez).
+export function toast(text) {
+  if (!text) return;
+  var box = $("toasts"), el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = text;
+  box.appendChild(el);
+  while (box.children.length > 3) box.removeChild(box.firstChild);
+  setTimeout(function () { el.classList.add("out"); }, 2200);
+  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 2700);
 }

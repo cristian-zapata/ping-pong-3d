@@ -1,6 +1,7 @@
 // La máquina: dificultad, movimiento de su paleta y elección de golpe.
 // Todas las funciones reciben el jugador (pl) que controla la IA; sirven para cualquier lado de la mesa.
-import { PZ, predict } from "./physics.js";
+import { P, predict } from "./physics.js";
+import { PP } from "./effects.js";
 import { clamp, rnd } from "./util.js";
 
 export var DIFF = {
@@ -23,17 +24,17 @@ export function aiOnOpponentHit(pl, diff) {
 export function aiShot(pl, diff, oppX) {
   var D = DIFF[diff];
   var power = D.pmin + Math.random() * (D.pmax - D.pmin);
-  var tx = clamp(-0.5 * oppX + rnd() * 0.45, -0.62, 0.62);
-  var tz = -pl.side * (0.55 + 0.55 * power);
+  var tx = clamp(-0.5 * oppX + rnd() * 0.45, -P.AI_AIM_X, P.AI_AIM_X);
+  var tz = -pl.side * (P.DEPTH_MIN + P.DEPTH_RANGE * power);
   if (Math.random() < D.fault) {
-    if (Math.random() < 0.5) tz = -pl.side * 1.75; else tx = (Math.random() < 0.5 ? -1 : 1) * 0.95;
+    if (Math.random() < 0.5) tz = -pl.side * P.AI_FAULT_Z; else tx = (Math.random() < 0.5 ? -1 : 1) * P.AI_FAULT_X;
   }
   pl.swing = 0.25;
   return { power: power, tx: tx, tz: tz };
 }
 
 // x donde la máquina quiere que caiga su saque.
-export function aiServeX() { return rnd() * 0.45; }
+export function aiServeX() { return rnd() * P.AI_SERVE_X; }
 
 export function updateAI(pl, h, S, B) {
   var D = DIFF[S.diff];
@@ -41,13 +42,13 @@ export function updateAI(pl, h, S, B) {
   if (pl.react <= 0) {
     pl.react = D.react;
     if (S.mode === "play" && B.live && B.vz * pl.side > 0) {
-      var p = predict(B.x, B.y, B.z, B.vx, B.vy, B.vz, pl.side * PZ);
-      if (p) { pl.tx = clamp(p.x + pl.err, -1.3, 1.3); pl.ty = clamp(p.y, 0.75, 1.4); }
+      var p = predict(B.x, B.y, B.z, B.vx, B.vy, B.vz, pl.side * P.PZ);
+      if (p) { pl.tx = clamp(p.x + pl.err, -P.AI_X, P.AI_X); pl.ty = clamp(p.y, P.PAD_YMIN, P.AI_YMAX); }
     } else {
       pl.tx = 0; pl.ty = 1.05;
     }
   }
-  var m = D.speed * h;
+  var m = Math.min(D.speed, PP[pl.i].speedCap) * h;     // un efecto puede limitar su velocidad
   pl.x += clamp(pl.tx - pl.x, -m, m);
   pl.y += clamp(pl.ty - pl.y, -m, m);
   pl.swing = Math.max(0, pl.swing - h);

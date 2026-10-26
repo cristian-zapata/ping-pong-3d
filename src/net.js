@@ -15,7 +15,7 @@
 
 var PREFIX = "ppn3d-v1-";                       // prefijo propio para no chocar con otros IDs del servidor público
 var ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ";       // sin I, L ni O (ni dígitos): nada ambiguo
-var PROTO = 1;                                  // versión del protocolo; anfitrión e invitado deben coincidir
+var PROTO = 2;                                  // versión del protocolo; anfitrión e invitado deben coincidir (2: efectos)
 var JOIN_TIMEOUT = 12000;
 
 var peer = null, ctl = null, rt = null, guestId = null;

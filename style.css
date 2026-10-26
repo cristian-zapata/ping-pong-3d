@@ -72,6 +72,23 @@ button:focus-visible { outline: 3px solid var(--ball); outline-offset: 2px; }
 .code-in { font: inherit; font-weight: 800; font-size: 34px; letter-spacing: 0.3em; text-transform: uppercase; text-align: center;
   width: 7.5ch; padding: 6px 0 6px 0.3em; margin: 0 0 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: #f2f4fb; }
 .code-in:focus { outline: 3px solid var(--ball); outline-offset: 2px; }
+.seg-label { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #8f98b8; margin: 0 0 6px; }
+.seg-wrap { flex-wrap: wrap; justify-content: center; }
+/* efectos: chips con icono y tiempo restante, y avisos */
+.fxbar { position: absolute; display: flex; flex-direction: column; gap: 6px; pointer-events: none; max-width: 46%; }
+.fx-me { left: 12px; bottom: 12px; align-items: flex-start; }
+.fx-them { right: 12px; top: 12px; align-items: flex-end; }
+.fx-all { left: 12px; top: 12px; align-items: flex-start; }
+.fx-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px 4px 4px; border-radius: 999px;
+  background: rgba(10, 14, 32, .72); color: #f2f4fb; font-size: 13px; font-weight: 700; border: 2px solid var(--fx, #fff);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fx-chip b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--fx, #fff); font-size: 13px; }
+.toasts { position: absolute; left: 0; right: 0; top: calc(9% + clamp(28px, 5vw, 46px)); display: flex; flex-direction: column;
+  align-items: center; gap: 6px; pointer-events: none; padding: 0 16px; }
+.toast { background: rgba(10, 14, 32, .78); color: #fff; font-weight: 700; font-size: clamp(13px, 2vw, 16px); padding: 6px 14px;
+  border-radius: 10px; transition: opacity .5s; text-align: center; }
+.toast.out { opacity: 0; }
+@media (max-width: 560px) { .fx-chip { font-size: 11px; } .fx-chip b { width: 18px; height: 18px; } }
 .foot { margin: 12px 2px 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
 @media (max-width: 560px) {
   .score { padding: 6px 12px; gap: 8px; }

@@ -32,6 +32,25 @@ npx serve .
 La conexión usa el servidor de señalización público de PeerJS solo para el encuentro inicial; después los datos
 van directo entre los dos navegadores. Lee [Limitaciones y riesgos](#limitaciones-y-riesgos) antes de compartirlo.
 
+## Efectos (en desarrollo)
+
+En el menú se elige el modo de efectos: **Sin efectos** (por defecto), **Solo power-ups**, **Solo eventos** o **Todo**.
+Se aplica a la partida contra la máquina y, en línea, lo decide quien crea la sala. Por ahora solo existe el sistema;
+los efectos concretos (orbes de power-up y eventos de mesa) llegan en las siguientes fases.
+
+- Todos los parámetros de juego se leen de **parámetros efectivos**: `P` (mundo, mesa, saque, golpes e IA, en
+  `physics.js`) y `PP[i]` (por jugador: alcance, rapidez de sus devoluciones y tope de velocidad de su paleta, en
+  `effects.js`). Sin efectos valen exactamente lo mismo que antes, y el juego se comporta igual.
+- Cada efecto dura **golpes** (devoluciones de su dueño; el saque no cuenta), **segundos** (de juego; se detienen en
+  pausa) o **puntos**. Los que duran puntos empiezan al comenzar el siguiente punto.
+- Los **eventos de mesa** solo pueden durar puntos, así que solo cambian entre puntos, nunca con la pelota en juego.
+  Al cambiar, la mesa destella 0.9 s y durante ese tiempo nadie puede sacar.
+- La interfaz muestra chips con icono y tiempo restante (tuyos abajo a la izquierda, del rival arriba a la derecha y
+  de mesa arriba a la izquierda) y un aviso cuando un efecto empieza o termina.
+- **En línea** solo el anfitrión activa efectos. Las snapshots llevan el modo y la lista de efectos activos; el invitado
+  la carga, recalcula `P`/`PP` (para dibujar y extrapolar con la misma física) y la dibuja. La versión de protocolo
+  subió a 2: anfitrión e invitado deben tener la misma versión del juego.
+
 ## Tests
 
 Requiere Node 20 o superior. No hay dependencias que instalar.
@@ -40,7 +59,9 @@ Requiere Node 20 o superior. No hay dependencias que instalar.
 npm test
 ```
 
-`test/physics.test.js` simula con el mismo paso (1/120 s) y las mismas funciones de `src/physics.js` que usa el juego, y verifica:
+`test/physics.test.js` comprueba que los valores por defecto son los validados y corre los barridos de `test/sim.js`, que simulan
+con el mismo paso (1/120 s) y las mismas funciones de `src/physics.js` que usa el juego, leyendo los rangos de `P`
+(así sirven con efectos activos). Verifica:
 
 - **Saques** (ambos lados, toda la franja de x de saque y de destino): botan primero en el lado de quien saca, luego en el contrario, pasan la red y llegan al plano de golpeo del receptor a una altura alcanzable, sin un segundo bote antes.
 - **Devoluciones** del jugador y de la máquina (sin el ruido aleatorio ni las faltas intencionales de la IA): cruzan la red y botan primero dentro de la mesa contraria.
@@ -53,19 +74,25 @@ Los parámetros del saque (`t1 = 0.26`, `z1 = 0.65`, altura `SERVE_Y = 1.2`) est
 - El saque de un jugador remoto solo lo dispara su propia entrada; la máquina saca sola desde cualquier lado.
 - Una partida máquina contra máquina termina con un marcador válido.
 
+`test/effects.test.js` prueba el sistema de efectos con efectos de prueba: validación del registro, valores por defecto
+exactos sin efectos, duraciones en segundos, golpes y puntos, composición y renovación, filtro por modo, que en una
+partida la mesa solo cambie entre puntos, el bloqueo del saque durante la animación, el tope de velocidad, y la carga
+saneada de la lista recibida por red.
+
 ## Estructura
 
 | Archivo | Responsabilidad |
 |---|---|
 | `index.html` | Marcado, carga de Three.js y PeerJS (scripts clásicos) y de `src/main.js` (módulo). |
 | `style.css` | Estilos. |
-| `src/physics.js` | Constantes, `launchTo`, `serveVel`, `predict` y el paso de simulación (red, mesa, plano de golpeo). Funciones puras: sin DOM ni Three. |
+| `src/physics.js` | Parámetros efectivos `P` (y sus `DEFAULTS`), `launchTo`, `serveVel`, `predict` y el paso de simulación (red, mesa, plano de golpeo). Sin DOM ni Three. |
+| `src/effects.js` | Sistema de efectos: registro, efectos activos y pendientes, duraciones, cálculo de `P` y `PP[i]`, y lista para la red. |
 | `src/game.js` | Estado de la partida, reglas, golpes, saque y puntos. Dos jugadores simétricos (`PL[0]` en z > 0, `PL[1]` en z < 0) con control `local`, `ia` o `remoto`. Sin DOM: avisa a la interfaz mediante `out`. |
 | `src/ai.js` | Dificultades y comportamiento de la máquina (para cualquier lado de la mesa). |
 | `src/render.js` | Escena Three.js (girada 180° para el jugador 1) y proyección del puntero al plano de la paleta. |
 | `src/input.js` | Teclado, puntero y gamepad. |
 | `src/ui.js` | Menús, marcador, mensajes y botones. |
-| `src/texts.js` | Textos de los mensajes desde el punto de vista de cada jugador. |
+| `src/texts.js` | Textos de los mensajes y avisos de efectos desde el punto de vista de cada jugador. |
 | `src/net.js` | Transporte P2P (lo único que conoce PeerJS): `crearSala`, `unirse`, `enviar`, `onMensaje`, `onEvento`, `cerrar`. |
 | `src/online.js` | Protocolo en línea: anfitrión autoritativo, entrada del invitado, snapshots, ping, revancha y desconexión. |
 | `src/audio.js` | Efectos de sonido (Web Audio). |

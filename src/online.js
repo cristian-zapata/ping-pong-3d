@@ -3,12 +3,14 @@
 //
 // Mensajes (JSON):
 //   invitado -> anfitrión  rt:  { t:"in", q, x, y, sw }      objetivo de su paleta (mundo) y contador de golpes
-//   anfitrión -> invitado  rt:  { t:"st", q, m, sc, sv, msg, b:[x,y,z,vx,vy,vz,viva,golpeador], p:[x0,y0,vx0,sw0,x1,y1,vx1,sw1] }
+//   anfitrión -> invitado  rt:  { t:"st", q, m, sc, sv, msg, b:[x,y,z,vx,vy,vz,viva,golpeador], p:[x0,y0,vx0,sw0,x1,y1,vx1,sw1],
+//                                fm: modo de efectos, fx: [[uid, id, dueño, restante], ...] }   (solo el anfitrión activa efectos)
 //                          ctl: { t:"ev", e, a }              sonidos
 //   ambos                  rt:  { t:"ping", ts } / { t:"pong", ts }
 //                          ctl: { t:"revancha" } · { t:"adios" }
 import * as net from "./net.js";
-import { SERVE_Y, SERVE_Z, integrate, hitsNet, netDeflect, onTable, bounceTable, bounceFloor } from "./physics.js";
+import { P, integrate, hitsNet, netDeflect, onTable, bounceTable, bounceFloor } from "./physics.js";
+import * as fx from "./effects.js";
 import { S, B, PL, out, setControls, newGame, trySwing, moveHuman, toMenu } from "./game.js";
 import { clamp } from "./util.js";
 import { playSound } from "./audio.js";
@@ -101,6 +103,7 @@ function endOnline() {
   role = null; connected = false; gen++;
   net.cerrar();
   S.online = false;
+  fx.clear();
   setControls("local", "ia", 0);
   ui.setOnline(false);
 }
@@ -163,7 +166,7 @@ function hostInput(m) {
   if (!isNum(m.q) || m.q <= lastInQ) return;            // viejo o repetido (el canal no garantiza orden)
   lastInQ = m.q;
   var p = PL[1];
-  if (isNum(m.x) && isNum(m.y)) { p.tx = clamp(m.x, -1.1, 1.1); p.ty = clamp(m.y, 0.75, 1.75); }
+  if (isNum(m.x) && isNum(m.y)) { p.tx = clamp(m.x, -P.PAD_X, P.PAD_X); p.ty = clamp(m.y, P.PAD_YMIN, P.PAD_YMAX); }
   if (isNum(m.sw) && m.sw > lastSw) { lastSw = m.sw; trySwing(1); }   // un golpe por paquete como máximo
 }
 
@@ -188,6 +191,10 @@ function guestSnapshot(m) {
   S.score[0] = Math.max(0, Math.floor(m.sc[0])); S.score[1] = Math.max(0, Math.floor(m.sc[1]));
   S.server = m.sv === 1 ? 1 : 0;
   S.mode = m.m;
+
+  // Efectos: el invitado solo carga lo que decide el anfitrión (recalcula P/PP para dibujar y extrapolar).
+  if (fx.MODES[m.fm]) S.fxMode = m.fm;
+  fx.load(m.fx);
 
   var d = sanitizeMsg(m.msg);
   if (JSON.stringify(d) !== JSON.stringify(S.msg)) { S.msg = d; out.msg(d); }
@@ -246,7 +253,7 @@ export function guestStep(h) {
 
   if (S.mode === "serve") {
     // Pelota en la mano de quien saca; si saco yo, sigue a mi paleta local.
-    if (S.server === 1) { B.x = PL[1].x; B.y = SERVE_Y; B.z = -SERVE_Z; }
+    if (S.server === 1) { B.x = PL[1].x; B.y = P.SERVE_Y; B.z = -P.SERVE_Z; }
     else { B.x = sim.x; B.y = sim.y; B.z = sim.z; }
     B.vx = B.vy = B.vz = 0; B.live = false;
     return;
@@ -275,7 +282,7 @@ function sendInput() {
 function sendSnapshot() {
   var a = PL[0], b = PL[1];
   net.enviar({
-    t: "st", q: ++snapQ, m: S.mode, sc: [S.score[0], S.score[1]], sv: S.server, msg: S.msg,
+    t: "st", q: ++snapQ, m: S.mode, sc: [S.score[0], S.score[1]], sv: S.server, msg: S.msg, fm: S.fxMode, fx: fx.snapshot(),
     b: [r4(B.x), r4(B.y), r4(B.z), r4(B.vx), r4(B.vy), r4(B.vz), B.live ? 1 : 0, B.hitter],
     p: [r4(a.x), r4(a.y), r4(a.vx), r4(a.swing), r4(b.x), r4(b.y), r4(b.vx), r4(b.swing)]
   }, false);

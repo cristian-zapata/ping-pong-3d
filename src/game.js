@@ -2,18 +2,21 @@
 // Dos jugadores simétricos: PL[0] juega en z > 0 y PL[1] en z < 0. Cada uno tiene un control:
 // "local" (este navegador), "ia" (la máquina) o "remoto" (entrada que llega por la red).
 // No depende del DOM ni del audio: avisa mediante `out` (lo conecta main.js).
+// Los parámetros salen de P (mundo/mesa) y PP[i] (jugador), que recalcula effects.js.
 import {
-  PZ, REACH, SERVE_Y, SERVE_Z, launchTo, serveVel,
-  integrate, hitsNet, netDeflect, onTable, bounceTable, crossPlane, bounceFloor, isOut
+  P, launchTo, serveVel, integrate, hitsNet, netDeflect, onTable, bounceTable, crossPlane, bounceFloor, isOut
 } from "./physics.js";
 import { clamp, rnd } from "./util.js";
 import { aiNewPoint, aiOnOpponentHit, aiShot, aiServeX, updateAI } from "./ai.js";
+import * as fx from "./effects.js";
 
 // ---------- Estado ----------
 // me: índice del jugador que ve esta pantalla. msg: descriptor del mensaje actual (ver texts.js).
-// online: partida en línea (sin pausa).
+// online: partida en línea (sin pausa). fxMode: modo de efectos ("off" | "powerups" | "events" | "all").
+// lock: segundos en que no se puede sacar porque la mesa acaba de cambiar (dura lo que su animación).
 export var S = { mode: "menu", prev: null, diff: "medio", score: [0, 0], me: 0, base: 0, server: 0, timer: 0,
-                 pending: null, wins: 0, losses: 0, guide: true, msg: null, online: false };
+                 pending: null, wins: 0, losses: 0, guide: true, msg: null, online: false, fxMode: "off", lock: 0 };
+export var TABLE_ANIM = fx.TABLE_ANIM;
 export var B = { x: 0, y: 1, z: 1.45, vx: 0, vy: 0, vz: 0, hitter: 0, need: "opp", live: false };
 
 function makePlayer(i, ctrl) {
@@ -26,8 +29,10 @@ export var out = {
   msg: function () {},        // msg(descriptor | null)
   hud: function () {},        // hud()
   overlay: function () {},    // overlay(tipo, gano) · overlay(null) la oculta
-  sound: function () {}       // sound("hit", potencia) · ("bounce") · ("net") · ("point", ganador)
+  sound: function () {},      // sound("hit", potencia) · ("bounce") · ("net") · ("point", ganador)
+  notice: function () {}      // notice({ k: "fx-on" | "fx-off", id, o }) al empezar o terminar un efecto
 };
+fx.onNotice(function (ev) { out.notice(ev); });
 
 export function setControls(c0, c1, me) { PL[0].ctrl = c0; PL[1].ctrl = c1; S.me = me; }
 
@@ -68,6 +73,7 @@ function onBounce(s) {
 
 export function newGame() {
   S.score[0] = 0; S.score[1] = 0; S.pending = null;
+  fx.clear();
   S.base = 1 - S.base;
   out.overlay(null);
   startPoint();
@@ -78,6 +84,9 @@ function startPoint() {
   S.mode = "serve";
   S.timer = 1.3;
   B.live = false; B.vx = B.vy = B.vz = 0; B.need = "opp";
+  var ver = fx.FX.tableVer;
+  fx.onPoint();                      // entre puntos: caducan/empiezan los efectos que duran puntos
+  S.lock = fx.FX.tableVer !== ver ? TABLE_ANIM : 0;   // si cambió la mesa, nadie saca hasta que acabe su animación
   PL.forEach(function (pl) { if (pl.ctrl === "ia") aiNewPoint(pl, S.diff); });
   say({ k: "serve", s: S.server });
   out.hud();
@@ -99,14 +108,24 @@ export function togglePause() {
 }
 
 export function toMenu() {
-  S.mode = "menu"; B.live = false; say(null); out.hud(); out.overlay("menu");
+  S.mode = "menu"; B.live = false; fx.clear(); say(null); out.hud(); out.overlay("menu");
 }
 
 export function setDiff(d) { S.diff = d; out.overlay("menu"); }
+export function setFxMode(m) { if (fx.MODES[m]) S.fxMode = m; out.overlay("menu"); }
+
+// Activa un efecto (solo quien ejecuta las reglas: modo local o anfitrión), si el modo de partida lo permite.
+// owner: jugador 0 | 1 (efectos de jugador) o -1 (globales y de mesa). Devuelve "on", "pending" o null.
+export function giveEffect(id, owner) {
+  if (S.online && S.me !== 0) return null;          // en línea solo el anfitrión (jugador 0) activa efectos
+  var def = fx.getDef(id);
+  if (!def || !fx.allowedIn(def, S.fxMode)) return null;
+  return fx.apply(id, owner);
+}
 
 // ---------- Golpes ----------
 function launchBall(x, y, z, Tx, Tz, tDes, hitter) {
-  var y0 = Math.max(y, 0.95);
+  var y0 = Math.max(y, P.HIT_YMIN);
   var v = launchTo(x, y0, z, Tx, Tz, tDes);
   B.x = x; B.y = y0; B.z = z; B.vx = v.vx; B.vy = v.vy; B.vz = v.vz;
   B.hitter = hitter; B.need = "opp"; B.live = true;
@@ -123,19 +142,20 @@ function hit(i, xx, yy) {
     // la dirección sale del movimiento de la paleta y de dónde tocó la pelota.
     power = pl.swing > 0 ? 1 : 0.35;
     var n = 0.28 * power * power;
-    tx = s * (clamp(s * pl.vx * 0.16 + s * (xx - pl.x) * 3.5, -0.65, 0.65) + rnd() * n);
-    tz = s * (-(0.55 + 0.55 * power) + rnd() * n);
+    tx = s * (clamp(s * pl.vx * 0.16 + s * (xx - pl.x) * 3.5, -P.AIM_X, P.AIM_X) + rnd() * n);
+    tz = s * (-(P.DEPTH_MIN + P.DEPTH_RANGE * power) + rnd() * n);
   }
-  launchBall(xx, yy, s * PZ, tx, tz, 0.9 - 0.45 * power, i);
+  launchBall(xx, yy, s * P.PZ, tx, tz, (P.T_BASE - P.T_POWER * power) * fx.PP[i].shotTime, i);
   out.sound("hit", power);
+  fx.onHit(i);
   if (opp.ctrl === "ia") aiOnOpponentHit(opp, S.diff);
 }
 
 function doServe(i) {
   var pl = PL[i];
-  var x0 = clamp(B.x, -0.6, 0.6), y0 = B.y, bx;
+  var x0 = clamp(B.x, -P.SERVE_X0, P.SERVE_X0), y0 = B.y, bx;
   if (pl.ctrl === "ia") bx = aiServeX();
-  else bx = clamp(x0 * 0.4 + pl.vx * 0.1, -0.5, 0.5);
+  else bx = clamp(x0 * 0.4 + pl.vx * 0.1, -P.SERVE_X2, P.SERVE_X2);
   var sv = serveVel(pl.side, x0, y0, bx);
   B.x = sv.x; B.y = sv.y; B.z = sv.z; B.vx = sv.vx; B.vy = sv.vy; B.vz = sv.vz;
   B.hitter = i;
@@ -150,7 +170,7 @@ function doServe(i) {
 export function trySwing(i) {
   var pl = PL[i];
   if (pl.ctrl === "ia") return;
-  if (S.mode === "serve" && S.server === i && !B.live) { doServe(i); return; }
+  if (S.mode === "serve" && S.server === i && !B.live) { if (S.lock <= 0) doServe(i); return; }
   if (S.mode === "play" && pl.cd <= 0) { pl.swing = 0.25; pl.cd = 0.4; }
 }
 
@@ -176,8 +196,8 @@ function stepBall(h) {
 
   // paleta del receptor (solo cuando ya botó en su lado)
   if (b.need === "done") {
-    var r = PL[1 - b.hitter], c = crossPlane(ox, oy, oz, b, r.side * PZ);
-    if (c && Math.abs(c.x - r.x) <= REACH && Math.abs(c.y - r.y) <= REACH) { hit(r.i, c.x, c.y); return; }
+    var r = PL[1 - b.hitter], c = crossPlane(ox, oy, oz, b, r.side * P.PZ), reach = reachOf(r.i);
+    if (c && Math.abs(c.x - r.x) <= reach && Math.abs(c.y - r.y) <= reach) { hit(r.i, c.x, c.y); return; }
   }
 
   if (isOut(b)) {
@@ -185,13 +205,23 @@ function stepBall(h) {
   }
 }
 
+// Alcance efectivo de la paleta del jugador i.
+export function reachOf(i) { return P.REACH * fx.PP[i].reachMul; }
+
 // ---------- Bucle lógico ----------
 // Paleta de un jugador humano: sigue a su objetivo (tx, ty), que fija input.js o la red.
+// Si un efecto limita su velocidad (PP.speedCap), el paso se acota a esa velocidad.
 export function moveHuman(pl, h) {
-  var ox = pl.x;
+  var ox = pl.x, cap = fx.PP[pl.i].speedCap;
   var k = Math.min(1, h * 70);
-  pl.x += (pl.tx - pl.x) * k;
-  pl.y += (pl.ty - pl.y) * k;
+  if (cap === Infinity) {
+    pl.x += (pl.tx - pl.x) * k;
+    pl.y += (pl.ty - pl.y) * k;
+  } else {
+    var m = cap * h;
+    pl.x += clamp((pl.tx - pl.x) * k, -m, m);
+    pl.y += clamp((pl.ty - pl.y) * k, -m, m);
+  }
   pl.vx += (((pl.x - ox) / h) - pl.vx) * Math.min(1, h * 20);
   pl.swing = Math.max(0, pl.swing - h);
   pl.cd = Math.max(0, pl.cd - h);
@@ -201,15 +231,17 @@ export function tick(h) {
   PL.forEach(function (pl) { if (pl.ctrl !== "ia") moveHuman(pl, h); });
   if (S.mode === "serve" || S.mode === "play" || S.mode === "point") {
     PL.forEach(function (pl) { if (pl.ctrl === "ia") updateAI(pl, h, S, B); });
+    fx.onSeconds(h);
   }
 
   if (S.mode === "serve") {
     var sp = PL[S.server];
+    if (S.lock > 0) S.lock = Math.max(0, S.lock - h);
     B.live = false;
     B.x = sp.x;
-    B.y = SERVE_Y;
-    B.z = sp.side * SERVE_Z;
-    if (sp.ctrl === "ia") { S.timer -= h; if (S.timer <= 0) doServe(S.server); }
+    B.y = P.SERVE_Y;
+    B.z = sp.side * P.SERVE_Z;
+    if (sp.ctrl === "ia") { S.timer -= h; if (S.timer <= 0 && S.lock <= 0) doServe(S.server); }
   } else if (S.mode === "play") {
     stepBall(h);
   } else if (S.mode === "point") {

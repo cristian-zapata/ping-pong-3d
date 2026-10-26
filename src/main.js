@@ -1,10 +1,11 @@
 // Punto de entrada: conecta los módulos y corre el bucle de paso fijo.
-import { PZ } from "./physics.js";
-import { S, B, PL, out, tick, trySwing, togglePause, newGame, toMenu, setDiff, setControls } from "./game.js";
+import { P } from "./physics.js";
+import { S, B, PL, out, tick, trySwing, togglePause, newGame, toMenu, setDiff, setFxMode, setControls } from "./game.js";
+import * as fx from "./effects.js";
 import { isMuted, setMuted, playSound } from "./audio.js";
 import { initInput, pollInput } from "./input.js";
 import { createRenderer } from "./render.js";
-import { msgText } from "./texts.js";
+import { msgText, fxText } from "./texts.js";
 import * as online from "./online.js";
 import * as ui from "./ui.js";
 
@@ -16,6 +17,7 @@ out.msg = function (d) { ui.setMsg(msgText(d, S.me, PL[1 - S.me].ctrl === "ia"))
 out.hud = function () { ui.updateHUD(S); };
 out.overlay = function (kind, won) { if (kind) ui.showOverlay(kind, S, won); else ui.hideOverlay(); };
 out.sound = function (name, arg) { playSound(name, arg, S.me); online.onSound(name, arg); };
+out.notice = function (ev) { ui.toast(fxText(ev, S.me, PL[1 - S.me].ctrl === "ia")); };
 
 // Modo contra la máquina: este navegador controla al jugador 0 y la IA al jugador 1.
 setControls("local", "ia", 0);
@@ -31,7 +33,7 @@ initInput({
   canvas: canvas,
   paddle: aim,
   canAim: function () { return S.mode !== "menu" && S.mode !== "over" && S.mode !== "paused"; },
-  project: function (nx, ny) { return view ? view.project(nx, ny, PZ) : null; },
+  project: function (nx, ny) { return view ? view.project(nx, ny, P.PZ) : null; },
   swing: function () { if (online.getRole() === "guest") online.guestSwing(); else trySwing(S.me); },
   pause: togglePause,
   autoPause: function () { if (S.mode === "play" || S.mode === "serve") togglePause(); },
@@ -48,6 +50,7 @@ function copyCode(btn) {
 
 ui.onOverlayAction(function (a, v) {
   if (a === "diff") setDiff(v);
+  else if (a === "fxmode") setFxMode(v);
   else if (a === "start") newGame();
   else if (a === "resume") togglePause();
   else if (a === "menu") { if (online.getRole()) online.leave(); else toMenu(); }
@@ -77,6 +80,7 @@ if (!view) {
       }
     }
     online.update(dt);
+    ui.updateFx(fx.list(), S.me);
     view.render(S, B, PL, S.me);
     requestAnimationFrame(frame);
   };

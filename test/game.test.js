@@ -1,7 +1,7 @@
 // Tests de reglas con jugadores simétricos (game.js no usa DOM, así que corre en Node).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PZ, predict } from "../src/physics.js";
+import { P, predict } from "../src/physics.js";
 import { S, B, PL, out, tick, trySwing, newGame, setControls } from "../src/game.js";
 import { msgText } from "../src/texts.js";
 
@@ -38,7 +38,7 @@ function makeBot(i, off) {
     var pl = PL[i];
     if (S.mode === "serve" && S.server === i) { wait += STEP; if (wait > 0.6) { wait = 0; trySwing(i); } }
     if (S.mode === "play" && B.live && B.vz * pl.side > 0) {
-      var p = predict(B.x, B.y, B.z, B.vx, B.vy, B.vz, pl.side * PZ);
+      var p = predict(B.x, B.y, B.z, B.vx, B.vy, B.vz, pl.side * P.PZ);
       if (p) { pl.tx = p.x + pl.side * off; pl.ty = p.y; if (p.t < 0.1) trySwing(i); }
     }
   };

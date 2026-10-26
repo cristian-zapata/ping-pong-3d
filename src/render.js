@@ -1,5 +1,6 @@
 // Escena Three.js. Three se carga como script clásico (global THREE) desde index.html.
-import { R, TOPY, HW, HL, NET_TOP, NETW, PZ, REACH, predict } from "./physics.js";
+import { P, DEFAULTS, predict } from "./physics.js";
+import { PP, FX, TABLE_ANIM } from "./effects.js";
 import { clamp } from "./util.js";
 
 // Devuelve { render(S, B, PL, me), project(nx, ny, planeZ) } o null si no hay Three/WebGL.
@@ -48,28 +49,42 @@ export function createRenderer(canvas, stage) {
   box(3.2, 0.9, 0.05, 0xffb020, 0, 3.4, -7.35, scene);
   box(3.2, 0.9, 0.05, 0x2a6fdb, 3, 3.4, -7.35, scene);
 
-  // mesa
-  box(1.525, 0.04, 2.74, 0x2a6fdb, 0, TOPY - 0.02, 0);
-  var lineY = TOPY + 0.002;
-  box(1.525, 0.003, 0.02, 0xffffff, 0, lineY, HL - 0.01);
-  box(1.525, 0.003, 0.02, 0xffffff, 0, lineY, -HL + 0.01);
-  box(0.02, 0.003, 2.74, 0xffffff, -HW + 0.01, lineY, 0);
-  box(0.02, 0.003, 2.74, 0xffffff, HW - 0.01, lineY, 0);
-  box(0.006, 0.003, 2.74, 0xffffff, 0, lineY, 0);
-  [[-0.68, -1.25], [0.68, -1.25], [-0.68, 1.25], [0.68, 1.25]].forEach(function (p) {
-    box(0.06, TOPY - 0.04, 0.06, 0x333a4d, p[0], (TOPY - 0.04) / 2, p[1]);
-  });
-  // red
-  var net = new THREE.Mesh(new THREE.PlaneGeometry(NETW * 2, 0.1525), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
-  net.position.set(0, TOPY + 0.076, 0); world.add(net);
-  box(NETW * 2, 0.012, 0.012, 0xffffff, 0, NET_TOP, 0);
-  box(0.02, 0.17, 0.02, 0x333a4d, -NETW, TOPY + 0.085, 0);
-  box(0.02, 0.17, 0.02, 0x333a4d, NETW, TOPY + 0.085, 0);
+  // mesa y red: se construyen desde P y se reconstruyen cuando un efecto cambia su geometría (FX.tableVer).
+  // Las medidas se escriben como "valor original + (P - DEFAULTS)" para que, sin efectos, sean idénticas.
+  var table = null, tableTop = null, tableVer = -1, flash = 0, lastT = 0;
+  function buildTable() {
+    if (table) {
+      world.remove(table);
+      table.traverse(function (o) { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    }
+    table = new THREE.Group();
+    var D = DEFAULTS, TOPY = P.TOPY, HW = P.HW, HL = P.HL, NETW = P.NETW;
+    var dW = HW - D.HW, dL = HL - D.HL, dN = P.NET_H - D.NET_H;
+    tableTop = box(HW * 2, 0.04, HL * 2, 0x2a6fdb, 0, TOPY - 0.02, 0, table);
+    var lineY = TOPY + 0.002;
+    box(HW * 2, 0.003, 0.02, 0xffffff, 0, lineY, HL - 0.01, table);
+    box(HW * 2, 0.003, 0.02, 0xffffff, 0, lineY, -HL + 0.01, table);
+    box(0.02, 0.003, HL * 2, 0xffffff, -HW + 0.01, lineY, 0, table);
+    box(0.02, 0.003, HL * 2, 0xffffff, HW - 0.01, lineY, 0, table);
+    box(0.006, 0.003, HL * 2, 0xffffff, 0, lineY, 0, table);
+    var lx = 0.68 + dW, lz = 1.25 + dL;
+    [[-lx, -lz], [lx, -lz], [-lx, lz], [lx, lz]].forEach(function (p) {
+      box(0.06, TOPY - 0.04, 0.06, 0x333a4d, p[0], (TOPY - 0.04) / 2, p[1], table);
+    });
+    // red
+    var net = new THREE.Mesh(new THREE.PlaneGeometry(NETW * 2, P.NET_H), new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+    net.position.set(0, TOPY + 0.076 + dN / 2, 0); table.add(net);
+    box(NETW * 2, 0.012, 0.012, 0xffffff, 0, P.NET_TOP, 0, table);
+    box(0.02, 0.17 + dN, 0.02, 0x333a4d, -NETW, TOPY + 0.085 + dN / 2, 0, table);
+    box(0.02, 0.17 + dN, 0.02, 0x333a4d, NETW, TOPY + 0.085 + dN / 2, 0, table);
+    world.add(table);
+  }
+  buildTable(); tableVer = FX.tableVer;
 
   // pelota y sombra
-  var ballMesh = new THREE.Mesh(new THREE.SphereGeometry(R * 1.25, 20, 16), new THREE.MeshLambertMaterial({ color: 0xff9a1f, emissive: 0x552200 }));
+  var ballMesh = new THREE.Mesh(new THREE.SphereGeometry(P.R * 1.25, 20, 16), new THREE.MeshLambertMaterial({ color: 0xff9a1f, emissive: 0x552200 }));
   world.add(ballMesh);
-  var shadow = new THREE.Mesh(new THREE.CircleGeometry(R * 1.6, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 }));
+  var shadow = new THREE.Mesh(new THREE.CircleGeometry(P.R * 1.6, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 }));
   shadow.rotation.x = -Math.PI / 2; world.add(shadow);
 
   // paletas
@@ -100,8 +115,8 @@ export function createRenderer(canvas, stage) {
   world.add(arm);
 
   // guía: aro donde llegará la pelota
-  var ring = new THREE.Mesh(new THREE.TorusGeometry(REACH, 0.011, 8, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthTest: false }));
-  ring.renderOrder = 10; ring.position.z = PZ; ring.visible = false; world.add(ring);
+  var ring = new THREE.Mesh(new THREE.TorusGeometry(DEFAULTS.REACH, 0.011, 8, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthTest: false }));
+  ring.renderOrder = 10; ring.position.z = P.PZ; ring.visible = false; world.add(ring);
 
   var UP = new THREE.Vector3(0, 1, 0), tv = new THREE.Vector3();
   function link(mesh, ax, ay, az, bx, by, bz) {
@@ -114,11 +129,15 @@ export function createRenderer(canvas, stage) {
 
   function swingFactor(t) { return t > 0 ? Math.sin(Math.PI * (1 - t / 0.25)) : 0; }
 
+  // Escala visual del alcance del jugador i (1 sin efectos): la paleta y el aro guía crecen con él.
+  function reachScale(i) { return P.REACH * PP[i].reachMul / DEFAULTS.REACH; }
+
   // Paleta del jugador pl en su lado (side = ±1); al golpear avanza hacia la red.
   function placePaddle(mesh, pl) {
     var sf = swingFactor(pl.swing), s = pl.side;
-    mesh.position.set(pl.x, pl.y, s * (PZ - sf * 0.28));
+    mesh.position.set(pl.x, pl.y, s * (P.PZ - sf * 0.28));
     mesh.rotation.set(-s * sf * 0.9, 0, pl.ctrl === "ia" ? -pl.x * 0.1 : -pl.vx * 0.05);
+    mesh.scale.setScalar(reachScale(pl.i));
     return sf;
   }
 
@@ -126,12 +145,23 @@ export function createRenderer(canvas, stage) {
   function render(S, B, PL, me) {
     var mine = PL[me], other = PL[1 - me];
     world.rotation.y = mine.side > 0 ? 0 : Math.PI;
+
+    // mesa: si cambió su geometría, se reconstruye y destella brevemente (TABLE_ANIM; mientras, no se puede sacar)
+    var t = performance.now() / 1000, dt = lastT ? Math.min(0.1, t - lastT) : 0;
+    lastT = t;
+    if (tableVer !== FX.tableVer) { tableVer = FX.tableVer; buildTable(); flash = TABLE_ANIM; }
+    if (flash > 0) {
+      flash = Math.max(0, flash - dt);
+      tableTop.material.emissive.setHex(0xffffff);
+      tableTop.material.emissiveIntensity = 0.45 * Math.abs(Math.sin(flash / TABLE_ANIM * Math.PI * 3));
+    }
+
     // pelota
     var showBall = S.mode !== "menu" && S.mode !== "over";
     ballMesh.visible = showBall; shadow.visible = showBall;
     ballMesh.position.set(B.x, B.y, B.z);
-    var overTable = Math.abs(B.x) <= HW && Math.abs(B.z) <= HL && B.y > TOPY;
-    var sy = overTable ? TOPY + 0.004 : 0.008;
+    var overTable = Math.abs(B.x) <= P.HW && Math.abs(B.z) <= P.HL && B.y > P.TOPY;
+    var sy = overTable ? P.TOPY + 0.004 : 0.008;
     shadow.position.set(B.x, sy, B.z);
     var hgt = Math.max(0.05, B.y - sy);
     shadow.scale.setScalar(clamp(1.3 - hgt * 0.5, 0.5, 1.3));
@@ -144,13 +174,13 @@ export function createRenderer(canvas, stage) {
     var os = other.side;
     rival.position.set(other.x * 0.55, 0, os * 2.4);
     rival.rotation.y = os > 0 ? Math.PI : 0;
-    link(arm, rival.position.x - os * 0.22, 1.2, rival.position.z - os * 0.05, other.x, other.y - 0.05, os * (PZ - sa * 0.28));
+    link(arm, rival.position.x - os * 0.22, 1.2, rival.position.z - os * 0.05, other.x, other.y - 0.05, os * (P.PZ - sa * 0.28));
 
     // guía: dónde cruzará la pelota el plano de golpeo de quien mira
-    var showGuide = false, pz = mine.side * PZ;
+    var showGuide = false, pz = mine.side * P.PZ;
     if (S.guide && B.live && B.vz * mine.side > 0 && (S.mode === "play")) {
       var pr = predict(B.x, B.y, B.z, B.vx, B.vy, B.vz, pz);
-      if (pr) { ring.position.set(pr.x, pr.y, pz); showGuide = true; }
+      if (pr) { ring.position.set(pr.x, pr.y, pz); ring.scale.setScalar(reachScale(me)); showGuide = true; }
     }
     ring.visible = showGuide;
 
