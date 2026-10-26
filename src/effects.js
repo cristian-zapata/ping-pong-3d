@@ -16,6 +16,7 @@
 //   points   empieza al comenzar el siguiente punto y baja al comenzar cada punto posterior.
 //            Los efectos de mesa DEBEN durar puntos: así solo cambian entre puntos, nunca con la pelota en juego.
 import { P, DEFAULTS, resetParams, setParams } from "./physics.js";
+import { BALANCE } from "./balance.js";
 
 export var PLAYER_DEFAULTS = Object.freeze({
   reachMul: 1,          // multiplica P.REACH (alcance de la paleta)
@@ -39,7 +40,7 @@ var notice = function () {};
 var TABLE_KEYS = ["TOPY", "HW", "HL", "NET_H", "NETW"];
 var tableSig = "";
 export var FX = { tableVer: 0 };   // sube cuando cambia la geometría de la mesa (render la reconstruye)
-export var TABLE_ANIM = 0.9;       // s que dura la animación de cambio de mesa (y en los que no se puede sacar)
+export var TABLE_ANIM = BALANCE.tableAnim;   // s de la animación de cambio de mesa (y en los que no se puede sacar)
 
 export function onNotice(fn) { notice = fn; }
 

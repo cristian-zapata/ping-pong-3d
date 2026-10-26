@@ -35,7 +35,8 @@ van directo entre los dos navegadores. Lee [Limitaciones y riesgos](#limitacione
 ## Efectos
 
 En el menú se elige el modo de efectos: **Sin efectos** (por defecto), **Solo power-ups**, **Solo eventos** o **Todo**.
-Se aplica a la partida contra la máquina y, en línea, lo decide quien crea la sala.
+Se aplica a la partida contra la máquina y, en línea, lo decide quien crea la sala. **Todos los números de esta sección
+están en [`src/balance.js`](src/balance.js)**: cámbialos ahí y corre `npm test` (los tests usan esos mismos valores).
 
 ### Power-ups (orbes)
 
@@ -156,6 +157,7 @@ saneada de la lista recibida por red.
 | `src/effects.js` | Sistema de efectos: registro, efectos activos y pendientes, duraciones, cálculo de `P` y `PP[i]`, y lista para la red. |
 | `src/powerups.js` | Los tres power-ups y el orbe: aparición, vida y detección de la pelota que pasa por él. |
 | `src/events.js` | Los cuatro eventos de mesa (ancho y altura de red) y cuándo empiezan. |
+| `src/balance.js` | Todos los números de los efectos (duraciones, probabilidades, multiplicadores) para ajustarlos sin tocar la lógica. |
 | `src/game.js` | Estado de la partida, reglas, golpes, saque y puntos. Dos jugadores simétricos (`PL[0]` en z > 0, `PL[1]` en z < 0) con control `local`, `ia` o `remoto`. Sin DOM: avisa a la interfaz mediante `out`. |
 | `src/ai.js` | Dificultades y comportamiento de la máquina (para cualquier lado de la mesa). |
 | `src/render.js` | Escena Three.js (girada 180° para el jugador 1) y proyección del puntero al plano de la paleta. |

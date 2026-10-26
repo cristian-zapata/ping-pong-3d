@@ -1,18 +1,14 @@
 // Eventos de mesa: cambian la mesa o la red durante unos puntos. Solo entre puntos (duran "puntos", ver effects.js)
 // y solo uno a la vez. Sin DOM. game.js llama a maybeEvent() al empezar cada punto.
 import { register, tableBusy } from "./effects.js";
+import { BALANCE } from "./balance.js";
 
-// Números de los eventos (se moverán a balance.js en la fase de equilibrio).
-export var EVT = {
-  FIRST: 2,          // puntos de la partida antes de que pueda haber un evento
-  GAP: 3,            // puntos mínimos entre que termina un evento y empieza otro
-  CHANCE: 0.35,      // probabilidad de que empiece uno al comenzar un punto, pasado el mínimo
-  LEN: 3             // puntos que dura cada evento
-};
+// Los números están en balance.js (EVT: FIRST, GAP, CHANCE, LEN y los factores de cada evento).
+export var EVT = BALANCE.events;
 // TODO: mesa corta/larga, gravedad y viento. Qué habría que revalidar en cada caso: ver "Pendiente (TODO)" en el README.
 
 // Factores validados con test/physics.test.js (que también comprueba su margen hasta el límite seguro).
-export var NARROW = 0.8, WIDE = 1.2, NET_HIGH = 1.5, NET_LOW = 0.5;
+export var NARROW = EVT.narrow, WIDE = EVT.wide, NET_HIGH = EVT.netHigh, NET_LOW = EVT.netLow;
 
 // Cambia el ancho de la mesa y, con él, todo lo que depende del ancho: red (sobresale lo mismo de cada lado),
 // objetivos de golpe, rangos de saque y las faltas intencionales de la máquina (que deben seguir cayendo fuera).

@@ -3,12 +3,14 @@
 import { P, predict } from "./physics.js";
 import { PP } from "./effects.js";
 import { clamp, rnd } from "./util.js";
+import { BALANCE } from "./balance.js";
 
-// orb: probabilidad de apuntar su devolución a través de un orbe de power-up, si hay uno en el camino.
+// orb: probabilidad de apuntar su devolución a través de un orbe de power-up (en balance.js).
+var AIM = BALANCE.aiOrbAim;
 export var DIFF = {
-  facil:   { label: "Fácil",   speed: 2.1, react: 0.22, err: 0.30, fault: 0.22, pmin: 0.25, pmax: 0.6,  orb: 0.3 },
-  medio:   { label: "Medio",   speed: 3.0, react: 0.14, err: 0.17, fault: 0.10, pmin: 0.4,  pmax: 0.85, orb: 0.5 },
-  dificil: { label: "Difícil", speed: 4.2, react: 0.08, err: 0.08, fault: 0.04, pmin: 0.55, pmax: 1.0,  orb: 0.7 }
+  facil:   { label: "Fácil",   speed: 2.1, react: 0.22, err: 0.30, fault: 0.22, pmin: 0.25, pmax: 0.6,  orb: AIM.facil },
+  medio:   { label: "Medio",   speed: 3.0, react: 0.14, err: 0.17, fault: 0.10, pmin: 0.4,  pmax: 0.85, orb: AIM.medio },
+  dificil: { label: "Difícil", speed: 4.2, react: 0.08, err: 0.08, fault: 0.04, pmin: 0.55, pmax: 1.0,  orb: AIM.dificil }
 };
 
 // Error de puntería al empezar un punto.

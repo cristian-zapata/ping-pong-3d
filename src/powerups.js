@@ -2,34 +2,27 @@
 // Sin DOM. game.js llama a orbStep() en cada paso y a orbTouched() con cada tramo de la pelota.
 import { P, DEFAULTS } from "./physics.js";
 import { register } from "./effects.js";
+import { BALANCE } from "./balance.js";
 
-// Números del orbe (se moverán a balance.js en la fase de equilibrio).
-export var ORB = {
-  R: 0.15,              // radio de recogida (la pelota lo toca si su centro pasa a menos de R + radio de la pelota)
-  FIRST: 6,             // s de juego antes del primer orbe de la partida
-  GAP: 14,              // s mínimos entre un orbe y el siguiente (desde que desaparece o se recoge)
-  CHANCE: 0.1,          // probabilidad por segundo de que aparezca, pasado el mínimo (media ~10 s más)
-  LIFE: 10,             // s que flota antes de desaparecer
-  X: 0.5,               // |x| máximo (con la mesa normal; se escala con su ancho)
-  Z0: 0.3, Z1: 0.95,    // |z| entre Z0 y Z1 (en cualquiera de las dos mitades, lejos de la red)
-  Y0: 0.22, Y1: 0.42    // altura sobre la mesa (por donde suele pasar la pelota)
-};
-export var FAST_SHOT = 0.7;   // la pelota rápida tarda 0.7 veces lo normal en llegar
+// Los números están en balance.js.
+var BIG = BALANCE.big, FAST = BALANCE.fast, FREEZE = BALANCE.freeze;
+export var ORB = BALANCE.orb;
+export var FAST_SHOT = FAST.shotTime;
 
 // target: "self" (lo recibe quien recoge el orbe) o "rival" (lo recibe su rival).
 // say: textos al empezar/terminar; [si el dueño es quien mira, si es su rival]. {R}/{r}: "La máquina"/"tu rival".
 export var POWERUPS = [
-  { id: "big", name: "Paleta grande", icon: "🏓", color: "#22c55e", cat: "powerup", scope: "player", unit: "seconds", n: 8,
-    target: "self", mod: function (pp) { pp.reachMul *= 1.5; },
-    say: { on: ["¡Paleta grande! Alcance ×1.5 durante 8 s", "{R} tiene paleta grande"],
+  { id: "big", name: "Paleta grande", icon: "🏓", color: "#22c55e", cat: "powerup", scope: "player", unit: "seconds", n: BIG.secs,
+    target: "self", mod: function (pp) { pp.reachMul *= BIG.reach; },
+    say: { on: ["¡Paleta grande! Alcance ×" + BIG.reach + " durante " + BIG.secs + " s", "{R} tiene paleta grande"],
            off: ["Se acabó tu paleta grande", "{R} ya no tiene paleta grande"] } },
-  { id: "fast", name: "Pelota rápida", icon: "⚡", color: "#facc15", cat: "powerup", scope: "player", unit: "hits", n: 1,
-    target: "self", mod: function (pp) { pp.shotTime *= FAST_SHOT; },
+  { id: "fast", name: "Pelota rápida", icon: "⚡", color: "#facc15", cat: "powerup", scope: "player", unit: "hits", n: FAST.hits,
+    target: "self", mod: function (pp) { pp.shotTime *= FAST.shotTime; },
     say: { on: ["¡Pelota rápida! Tu siguiente devolución saldrá más rápida", "{R} tiene pelota rápida: ¡atento!"],
            off: ["¡Ahí va tu pelota rápida!", "¡Cuidado, pelota rápida!"] } },
-  { id: "freeze", name: "Congelado", icon: "❄", color: "#38bdf8", cat: "powerup", scope: "player", unit: "seconds", n: 3,
-    target: "rival", mod: function (pp) { pp.speedCap = Math.min(pp.speedCap, 0.6); },
-    say: { on: ["¡{R} te congeló! Tu paleta va lenta 3 s", "¡Congelaste a {r}!"],
+  { id: "freeze", name: "Congelado", icon: "❄", color: "#38bdf8", cat: "powerup", scope: "player", unit: "seconds", n: FREEZE.secs,
+    target: "rival", mod: function (pp) { pp.speedCap = Math.min(pp.speedCap, FREEZE.speed); },
+    say: { on: ["¡{R} te congeló! Tu paleta va lenta " + FREEZE.secs + " s", "¡Congelaste a {r}!"],
            off: ["Ya no estás congelado", "{R} se descongeló"] } }
 ];
 POWERUPS.forEach(register);
