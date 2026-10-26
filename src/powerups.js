@@ -1,6 +1,6 @@
 // Power-ups: los tres efectos que dan los orbes y las reglas del orbe (aparición, vida y recogida).
 // Sin DOM. game.js llama a orbStep() en cada paso y a orbTouched() con cada tramo de la pelota.
-import { P } from "./physics.js";
+import { P, DEFAULTS } from "./physics.js";
 import { register } from "./effects.js";
 
 // Números del orbe (se moverán a balance.js en la fase de equilibrio).
@@ -10,7 +10,7 @@ export var ORB = {
   GAP: 14,              // s mínimos entre un orbe y el siguiente (desde que desaparece o se recoge)
   CHANCE: 0.1,          // probabilidad por segundo de que aparezca, pasado el mínimo (media ~10 s más)
   LIFE: 10,             // s que flota antes de desaparecer
-  X: 0.5,               // |x| máximo
+  X: 0.5,               // |x| máximo (con la mesa normal; se escala con su ancho)
   Z0: 0.3, Z1: 0.95,    // |z| entre Z0 y Z1 (en cualquiera de las dos mitades, lejos de la red)
   Y0: 0.22, Y1: 0.42    // altura sobre la mesa (por donde suele pasar la pelota)
 };
@@ -50,7 +50,7 @@ export function orbStep(S, h) {
     var r = Math.random, side = r() < 0.5 ? 1 : -1;
     S.orb = {
       kind: IDS[Math.floor(r() * IDS.length)],
-      x: (r() * 2 - 1) * ORB.X,
+      x: (r() * 2 - 1) * ORB.X * P.HW / DEFAULTS.HW,
       y: P.TOPY + ORB.Y0 + r() * (ORB.Y1 - ORB.Y0),
       z: side * (ORB.Z0 + r() * (ORB.Z1 - ORB.Z0)),
       life: ORB.LIFE

@@ -135,6 +135,30 @@ export function createRenderer(canvas, stage) {
   var legR = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.7, 10), mat(0x2d3350)); legR.position.set(0.1, 0.35, 0); rival.add(legR);
   rival.position.z = -2.4;
   world.add(rival);
+
+  // nombre del rival sobre su cabeza (solo en línea): texto dibujado en un canvas, nunca HTML
+  var nameTag = null, nameTagText = "";
+  function setNameTag(text) {
+    if (text === nameTagText) return;
+    nameTagText = text;
+    if (nameTag) { rival.remove(nameTag); nameTag.material.map.dispose(); nameTag.material.dispose(); nameTag = null; }
+    if (!text) return;
+    var c = document.createElement("canvas"), g = c.getContext("2d"), font = "700 56px 'Bricolage Grotesque', system-ui, sans-serif";
+    g.font = font;
+    var w = Math.ceil(g.measureText(text).width) + 56;
+    c.width = w; c.height = 96;
+    g.font = font;
+    g.fillStyle = "rgba(10, 14, 32, 0.78)";
+    g.beginPath(); g.moveTo(24, 8); g.arcTo(w - 8, 8, w - 8, 88, 24); g.arcTo(w - 8, 88, 8, 88, 24); g.arcTo(8, 88, 8, 8, 24); g.arcTo(8, 8, w - 8, 8, 24); g.fill();
+    g.fillStyle = "#ffffff"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(text, w / 2, 50);
+    var tex = new THREE.CanvasTexture(c);
+    nameTag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, depthTest: false }));
+    nameTag.renderOrder = 11;
+    nameTag.scale.set(0.34 * w / 96, 0.34, 1);
+    nameTag.position.y = 1.98;
+    rival.add(nameTag);
+  }
   var arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1, 10), mat(0xf2c9a0));
   world.add(arm);
 
@@ -200,6 +224,7 @@ export function createRenderer(canvas, stage) {
     var os = other.side;
     rival.position.set(other.x * 0.55, 0, os * 2.4);
     rival.rotation.y = os > 0 ? Math.PI : 0;
+    setNameTag(S.online && S.rivalName && S.mode !== "menu" ? S.rivalName : "");
     link(arm, rival.position.x - os * 0.22, 1.2, rival.position.z - os * 0.05, other.x, other.y - 0.05, os * (P.PZ - sa * 0.28));
 
     // orbe: flota con un leve vaivén (solo visual; la recogida usa su posición exacta)

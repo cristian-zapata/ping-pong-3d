@@ -3,6 +3,14 @@
 // d: null | { k: "serve", s } | { k: "point", w, h, why: "net" | "out" | "own" | "miss" }
 import { getDef } from "./effects.js";
 
+// Nombre de usuario: se limpia al escribirlo y al recibirlo del rival (es un dato que llega de otro jugador).
+// Solo letras (con acentos), números, espacios, punto, guion y guion bajo; de NAME_MIN a NAME_MAX caracteres.
+export var NAME_MIN = 2, NAME_MAX = 16;
+export function cleanName(s) {
+  return String(s == null ? "" : s).replace(/[^\p{L}\p{N} ._-]/gu, "").replace(/\s+/g, " ").trim().slice(0, NAME_MAX).trim();
+}
+export function validName(s) { return cleanName(s).length >= NAME_MIN; }
+
 export function msgText(d, me, rivalAI) {
   if (!d) return "";
   var R = rivalAI ? "La máquina" : "Tu rival", r = rivalAI ? "la máquina" : "tu rival";

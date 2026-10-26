@@ -35,12 +35,14 @@ function reachZone(side, reach) {
 }
 
 // Saques con los parámetros actuales. reach: alcance del receptor (para comprobar que puede devolver).
-export function checkServes(reach) {
+function n(k, dens) { return Math.max(3, Math.round(k * (dens || 1))); }
+
+export function checkServes(reach, dens) {
   var count = 0, minReturn = Infinity, minTotal = Infinity, failures = [];
   [1, -1].forEach(function (side) {
     // x0: game.js acota la x de saque a ±SERVE_X0; x2: ±SERVE_X2 el humano, ±AI_SERVE_X (menor) la máquina.
-    range(-P.SERVE_X0, P.SERVE_X0, 25).forEach(function (x0) {
-      range(-P.SERVE_X2, P.SERVE_X2, 21).forEach(function (x2) {
+    range(-P.SERVE_X0, P.SERVE_X0, n(25, dens)).forEach(function (x0) {
+      range(-P.SERVE_X2, P.SERVE_X2, n(21, dens)).forEach(function (x2) {
         count++;
         var b = serveVel(side, x0, P.SERVE_Y, x2);
         var recv = -side, z = reachZone(recv, reach);
@@ -74,13 +76,13 @@ function checkReturn(fromZ, x, y, tx, tz, tDes) {
 
 // Devoluciones de un lado con los parámetros actuales. shotTime: factor de tiempo de vuelo (PP.shotTime).
 // side +1: golpe humano (potencia 0.35 o 1, objetivo ±AIM_X); side -1: golpe de la máquina (sin faltas intencionales).
-export function checkReturns(side, reach, shotTime) {
+export function checkReturns(side, reach, shotTime, dens) {
   var count = 0, failures = [], z = reachZone(side, reach);
   var powers = side === 1 ? [0.35, 1] : range(0.25, 1, 7), aim = side === 1 ? P.AIM_X : P.AI_AIM_X;
   powers.forEach(function (power) {
-    range(-z.x, z.x, 15).forEach(function (x) {
-      range(z.y0, z.y1, side === 1 ? 12 : 10).forEach(function (y) {
-        range(-aim, aim, 9).forEach(function (tx) {
+    range(-z.x, z.x, n(15, dens)).forEach(function (x) {
+      range(z.y0, z.y1, n(side === 1 ? 12 : 10, dens)).forEach(function (y) {
+        range(-aim, aim, n(9, dens)).forEach(function (tx) {
           count++;
           var tz = -side * (P.DEPTH_MIN + P.DEPTH_RANGE * power);
           var r = checkReturn(side * P.PZ, x, y, tx, tz, (P.T_BASE - P.T_POWER * power) * shotTime);

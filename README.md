@@ -35,8 +35,7 @@ van directo entre los dos navegadores. Lee [Limitaciones y riesgos](#limitacione
 ## Efectos
 
 En el menú se elige el modo de efectos: **Sin efectos** (por defecto), **Solo power-ups**, **Solo eventos** o **Todo**.
-Se aplica a la partida contra la máquina y, en línea, lo decide quien crea la sala. Los eventos de mesa llegan en la
-siguiente fase; por ahora "Solo eventos" no cambia nada.
+Se aplica a la partida contra la máquina y, en línea, lo decide quien crea la sala.
 
 ### Power-ups (orbes)
 
@@ -52,6 +51,45 @@ segundo) aparece un orbe flotando sobre la mesa durante 10 s. **Lo recoge quien 
 
 La máquina también los recoge (según la dificultad, a veces apunta su devolución para que pase por el orbe) y los
 sufre igual que tú. La guía sigue siendo exacta: usa la misma física que la pelota.
+
+### Eventos de mesa
+
+Al empezar un punto (no en los 2 primeros de la partida y con al menos 3 puntos entre uno y otro) hay un 35 % de
+probabilidad de que empiece un evento, que dura **3 puntos**. Solo hay uno a la vez y solo cambian entre puntos: la mesa
+destella 0.9 s, aparece un aviso y nadie puede sacar hasta que termina la animación.
+
+| Evento | Cambio | Margen comprobado por el test |
+|---|---|---|
+| ⇥ Mesa angosta | Ancho ×0.8 | Todo sigue válido de ×0.7 a ×1.3 (y se probó hasta ×0.6–×1.5) |
+| ⇔ Mesa ancha | Ancho ×1.2 | Ídem |
+| ⬆ Red alta | Altura ×1.5 (22.9 cm) | Los saques dejan de pasar con ×1.96; el test exige ≥ 20 % de margen |
+| ⬇ Red baja | Altura ×0.5 (7.6 cm) | Válido de ×0.4 hacia arriba |
+
+Al cambiar el ancho también se escalan los objetivos de golpe, los rangos de saque, las faltas intencionales de la
+máquina (siguen cayendo fuera), la red (sobresale lo mismo de cada lado), las líneas, las patas y la zona de los orbes.
+
+### Pendiente (TODO): otros eventos y qué habría que revalidar
+
+- **Mesa corta / larga** (cambiar `HL`): el saque está validado con posiciones absolutas (`SERVE_Z` 1.45 y primer bote en
+  `SERVE_Z1` 0.65) y el plano de golpeo `PZ` (1.55) debe quedar siempre detrás del final de la mesa. Habría que escalar
+  `SERVE_Z`, `SERVE_Z1`, `PZ` (y con él la cámara y la proyección del puntero), la profundidad de los golpes
+  (`DEPTH_MIN`/`DEPTH_RANGE`), la falta larga de la máquina (`AI_FAULT_Z` > `HL`), la zona de orbes (`ORB.Z0`/`Z1`) y
+  el límite de "fuera" de `isOut`; y volver a barrer saques y devoluciones para cada largo.
+- **Gravedad**: cambia el arco de todo. `serveVel` usa un tiempo fijo al primer bote (`SERVE_T1`), así que con otra
+  gravedad cambian la altura del bote y el tiempo para devolver; `launchTo` y `predict` ya la leen de `P`. Habría que
+  barrer saques (que sigan pasando la red y lleguen a una altura alcanzable entre `PAD_YMIN` y `PAD_YMAX`), devoluciones,
+  la altura de los orbes y comprobar que la IA (`AI_YMAX`) sigue llegando.
+- **Viento**: es un término nuevo de la física (aceleración lateral o longitudinal). Habría que añadirlo a `integrate`,
+  `predict` (para que la guía siga siendo exacta) y a la extrapolación del invitado, decidir si `launchTo` lo compensa
+  al apuntar (si no, muchas devoluciones caerían fuera), activarlo solo entre puntos, y barrer saques y devoluciones con
+  cada intensidad y dirección permitida.
+
+## Nombre de usuario
+
+Para crear sala o unirse hay que escribir un nombre (2 a 16 letras o números; se guarda en este navegador). Se envía
+al rival al conectar y aparece **sobre la cabeza del rival**, en el marcador y en un aviso "Juegas contra …". Se limpia
+al escribirlo y al recibirlo (solo letras, números, espacio, `.`, `_` y `-`) y nunca se inserta como HTML. Contra la
+máquina no hace falta.
 
 - Todos los parámetros de juego se leen de **parámetros efectivos**: `P` (mundo, mesa, saque, golpes e IA, en
   `physics.js`) y `PP[i]` (por jugador: alcance, rapidez de sus devoluciones y tope de velocidad de su paleta, en
@@ -98,6 +136,11 @@ azar extra cuando el modo no los permite), la recogida y quién recibe cada efec
 el congelado en humano y máquina, que la máquina recoge orbes y termina partidas válidas, y que la guía coincide con el
 vuelo real con efectos activos.
 
+Para los eventos de mesa, `test/physics.test.js` barre anchos (×0.7 a ×1.3) y alturas de red (×0.4 a ×1.6), busca por
+bisección la altura de red en que los saques dejan de pasar y exige un 20 % de margen a la red alta, y prueba **cada
+estado de mesa del registro con cada combinación de power-ups**. `test/events.test.js` prueba el registro, la espera
+inicial, que solo haya uno a la vez, su duración, la espera entre eventos, el filtro por modo y partidas completas.
+
 `test/effects.test.js` prueba el sistema de efectos con efectos de prueba: validación del registro, valores por defecto
 exactos sin efectos, duraciones en segundos, golpes y puntos, composición y renovación, filtro por modo, que en una
 partida la mesa solo cambie entre puntos, el bloqueo del saque durante la animación, el tope de velocidad, y la carga
@@ -112,12 +155,13 @@ saneada de la lista recibida por red.
 | `src/physics.js` | Parámetros efectivos `P` (y sus `DEFAULTS`), `launchTo`, `serveVel`, `predict` y el paso de simulación (red, mesa, plano de golpeo). Sin DOM ni Three. |
 | `src/effects.js` | Sistema de efectos: registro, efectos activos y pendientes, duraciones, cálculo de `P` y `PP[i]`, y lista para la red. |
 | `src/powerups.js` | Los tres power-ups y el orbe: aparición, vida y detección de la pelota que pasa por él. |
+| `src/events.js` | Los cuatro eventos de mesa (ancho y altura de red) y cuándo empiezan. |
 | `src/game.js` | Estado de la partida, reglas, golpes, saque y puntos. Dos jugadores simétricos (`PL[0]` en z > 0, `PL[1]` en z < 0) con control `local`, `ia` o `remoto`. Sin DOM: avisa a la interfaz mediante `out`. |
 | `src/ai.js` | Dificultades y comportamiento de la máquina (para cualquier lado de la mesa). |
 | `src/render.js` | Escena Three.js (girada 180° para el jugador 1) y proyección del puntero al plano de la paleta. |
 | `src/input.js` | Teclado, puntero y gamepad. |
 | `src/ui.js` | Menús, marcador, mensajes y botones. |
-| `src/texts.js` | Textos de los mensajes y avisos de efectos desde el punto de vista de cada jugador. |
+| `src/texts.js` | Textos de los mensajes y avisos de efectos desde el punto de vista de cada jugador, y limpieza del nombre de usuario. |
 | `src/net.js` | Transporte P2P (lo único que conoce PeerJS): `crearSala`, `unirse`, `enviar`, `onMensaje`, `onEvento`, `cerrar`. |
 | `src/online.js` | Protocolo en línea: anfitrión autoritativo, entrada del invitado, snapshots, ping, revancha y desconexión. |
 | `src/audio.js` | Efectos de sonido (Web Audio). |

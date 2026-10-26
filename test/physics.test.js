@@ -1,10 +1,11 @@
 // Tests de física con los parámetros por defecto y con todas las combinaciones de power-ups. Los barridos están en sim.js.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { P, DEFAULTS, resetParams, launchTo } from "../src/physics.js";
+import { P, DEFAULTS, resetParams, setParams, launchTo } from "../src/physics.js";
 import { checkServes, checkReturns } from "./sim.js";
 import { POWERUPS } from "../src/powerups.js";
 import { PLAYER_DEFAULTS } from "../src/effects.js";
+import { EVENTS, NARROW, WIDE, NET_HIGH, NET_LOW, widthMod, netMod } from "../src/events.js";
 
 test("los valores por defecto son los validados", function () {
   resetParams();
@@ -93,4 +94,75 @@ test("la pelota rápida de verdad llega antes (también cuando hay que subir el 
   });
   t.diagnostic(n + " golpes: la rápida tarda como mucho " + worst.toFixed(2) + " de lo normal");
   assert.ok(worst <= 0.85, "peor caso " + worst);
+});
+
+// ---------- Eventos de mesa ----------
+// Pone P como lo dejaría un conjunto de efectos de mesa (aplicando sus mod() del registro, como effects.recompute).
+function applyTable(mods) {
+  resetParams();
+  var cur = Object.assign({}, DEFAULTS);
+  mods.forEach(function (m) { m(cur); });
+  setParams(cur);
+}
+function failCount(reach, shotTime, dens) {
+  var s = checkServes(reach, dens), a = checkReturns(1, reach, shotTime, dens), b = checkReturns(-1, reach, shotTime, dens);
+  return { serves: s.failures.length, returns: a.failures.length + b.failures.length, count: s.count + a.count + b.count,
+           example: (s.failures[0] || a.failures[0] || b.failures[0]) };
+}
+
+test("barrido de anchos de mesa (x0.7 a x1.3): saques válidos y devoluciones dentro de la mesa", function (t) {
+  var bad = [], total = 0;
+  for (var f = 0.7; f <= 1.3001; f += 0.05) {
+    applyTable([widthMod(f)]);
+    var r = failCount(P.REACH, 1, 0.6);
+    total += r.count;
+    if (r.serves || r.returns) bad.push("x" + f.toFixed(2) + ": " + JSON.stringify(r));
+    assert.ok(P.NETW - P.HW > 0.15 && P.AI_FAULT_X > P.HW + P.R, "la red sobresale y las faltas de la IA caen fuera (x" + f.toFixed(2) + ")");
+  }
+  resetParams();
+  t.diagnostic("13 anchos, " + total + " simulaciones (eventos: x" + NARROW + " y x" + WIDE + ")");
+  assert.deepEqual(bad, []);
+});
+
+test("barrido de alturas de red (x0.4 a x1.6): saques y devoluciones válidos", function (t) {
+  var bad = [], total = 0;
+  for (var f = 0.4; f <= 1.6001; f += 0.1) {
+    applyTable([netMod(f)]);
+    var r = failCount(P.REACH, 1, 0.6);
+    total += r.count;
+    if (r.serves || r.returns) bad.push("x" + f.toFixed(1) + ": " + JSON.stringify(r));
+  }
+  resetParams();
+  t.diagnostic("13 alturas, " + total + " simulaciones (eventos: x" + NET_LOW + " y x" + NET_HIGH + ")");
+  assert.deepEqual(bad, []);
+});
+
+test("la red alta deja al menos un 20 % de margen hasta la altura en que los saques dejan de pasar", function (t) {
+  var lo = NET_HIGH, hi = 3;                       // busca por bisección el primer factor con saques inválidos
+  applyTable([netMod(hi)]);
+  assert.ok(checkServes(P.REACH, 0.4).failures.length > 0, "con x3 los saques deben fallar");
+  while (hi - lo > 0.01) {
+    var mid = (lo + hi) / 2;
+    applyTable([netMod(mid)]);
+    if (checkServes(P.REACH, 0.4).failures.length) hi = mid; else lo = mid;
+  }
+  resetParams();
+  t.diagnostic("los saques dejan de pasar con la red x" + hi.toFixed(2) + " (" + (DEFAULTS.NET_H * hi * 100).toFixed(1) + " cm); red alta: x" + NET_HIGH);
+  assert.ok(NET_HIGH <= hi * 0.8, "margen insuficiente: límite x" + hi.toFixed(2));
+});
+
+test("todas las combinaciones permitidas: cada estado de la mesa por cada combinación de power-ups", function (t) {
+  var tables = [{ name: "mesa normal", mods: [] }].concat(EVENTS.map(function (e) { return { name: e.name, mods: [e.mod] }; }));
+  var combos = playerCombos(), bad = [], total = 0;
+  tables.forEach(function (tb) {
+    combos.forEach(function (c) {
+      applyTable(tb.mods);
+      var r = failCount(P.REACH * c.pp.reachMul, c.pp.shotTime, 0.6);
+      total += r.count;
+      if (r.serves || r.returns) bad.push(tb.name + " + " + c.names + ": " + JSON.stringify(r));
+    });
+  });
+  resetParams();
+  t.diagnostic(tables.length + " estados de mesa x " + combos.length + " combinaciones de power-ups, " + total + " simulaciones");
+  assert.deepEqual(bad, []);
 });

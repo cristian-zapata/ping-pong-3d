@@ -72,6 +72,10 @@ button:focus-visible { outline: 3px solid var(--ball); outline-offset: 2px; }
 .code-in { font: inherit; font-weight: 800; font-size: 34px; letter-spacing: 0.3em; text-transform: uppercase; text-align: center;
   width: 7.5ch; padding: 6px 0 6px 0.3em; margin: 0 0 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: #f2f4fb; }
 .code-in:focus { outline: 3px solid var(--ball); outline-offset: 2px; }
+.name-in { font: inherit; font-weight: 700; font-size: 16px; text-align: center; width: min(260px, 100%); padding: 8px 12px;
+  margin: 0 0 4px; border-radius: 10px; border: 2px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: #f2f4fb; }
+.name-in:focus { outline: 3px solid var(--ball); outline-offset: 2px; }
+.name-label { margin-top: 14px; }
 .seg-label { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #8f98b8; margin: 0 0 6px; }
 .seg-wrap { flex-wrap: wrap; justify-content: center; }
 /* efectos: chips con icono y tiempo restante, y avisos */

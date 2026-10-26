@@ -8,13 +8,14 @@
 //                                ob: orbe [tipo, x, y, z] o null }
 //                          ctl: { t:"ev", e, a }              sonidos
 //   ambos                  rt:  { t:"ping", ts } / { t:"pong", ts }
-//                          ctl: { t:"revancha" } · { t:"adios" }
+//                          ctl: { t:"revancha" } · { t:"adios" } · { t:"nombre", n }  (nombre del jugador, se limpia al recibirlo)
 import * as net from "./net.js";
 import { P, integrate, hitsNet, netDeflect, onTable, bounceTable, bounceFloor } from "./physics.js";
 import * as fx from "./effects.js";
 import { isOrbKind } from "./powerups.js";
 import { S, B, PL, out, setControls, newGame, trySwing, moveHuman, toMenu } from "./game.js";
 import { clamp } from "./util.js";
+import { cleanName } from "./texts.js";
 import { playSound } from "./audio.js";
 import * as ui from "./ui.js";
 
@@ -56,7 +57,7 @@ function reset() {
 
 // ---------- Crear / unirse / salir ----------
 export function startHost() {
-  reset(); role = "host";
+  reset(); role = "host"; S.rivalName = "";
   var g = ++gen;
   setControls("local", "remoto", 0); S.online = true;
   ui.showOverlay("connecting", S, "Creando sala…");
@@ -70,7 +71,7 @@ export function startHost() {
 export function startGuest(raw) {
   var c = net.normalizarCodigo(raw);
   if (!net.codigoValido(c)) { ui.setOverlayNote("El código son 4 letras (no se usan I, L ni O)."); return; }
-  reset(); role = "guest"; code = c;
+  reset(); role = "guest"; code = c; S.rivalName = "";
   var g = ++gen;
   setControls("remoto", "local", 1); S.online = true;
   ui.showOverlay("connecting", S, "Buscando la sala " + c + "…");
@@ -84,6 +85,8 @@ export function startGuest(raw) {
 function begin() {
   connected = true; lastRecv = now();
   ui.setOnline(true);
+  if (S.rivalName) ui.setRivalName(S.rivalName);     // el nombre del rival pudo llegar antes que este momento
+  net.enviar({ t: "nombre", n: S.myName }, true);
   if (role === "host") newGame();
 }
 
@@ -104,7 +107,7 @@ function fail(c) {
 function endOnline() {
   role = null; connected = false; gen++;
   net.cerrar();
-  S.online = false;
+  S.online = false; S.rivalName = "";
   fx.clear(); S.orb = null;
   setControls("local", "ia", 0);
   ui.setOnline(false);
@@ -151,6 +154,11 @@ function onMessage(m) {
     return;
   }
   if (m.t === "adios") { lost("Tu rival salió de la sala", "La partida terminó."); return; }
+  if (m.t === "nombre") {
+    var nm = cleanName(m.n);
+    if (nm && nm !== S.rivalName) { S.rivalName = nm; ui.setRivalName(nm); ui.toast("Juegas contra " + nm); }
+    return;
+  }
   if (m.t === "revancha") {
     if (S.mode === "over") ui.setOverlayNote(meReady ? "Empezando…" : "Tu rival quiere la revancha.");
     rivalReady = true; maybeRematch();

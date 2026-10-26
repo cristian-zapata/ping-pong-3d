@@ -10,15 +10,17 @@ import { clamp, rnd } from "./util.js";
 import { aiNewPoint, aiOnOpponentHit, aiShot, aiServeX, updateAI } from "./ai.js";
 import * as fx from "./effects.js";
 import { ORB, orbStep, orbTouched } from "./powerups.js";
+import { EVT, maybeEvent } from "./events.js";
 
 // ---------- Estado ----------
 // me: índice del jugador que ve esta pantalla. msg: descriptor del mensaje actual (ver texts.js).
 // online: partida en línea (sin pausa). fxMode: modo de efectos ("off" | "powerups" | "events" | "all").
 // lock: segundos en que no se puede sacar porque la mesa acaba de cambiar (dura lo que su animación).
 // orb: orbe de power-up flotando (null o { kind, x, y, z, life }); orbWait: s hasta que pueda aparecer otro.
+// evWait: puntos hasta que pueda empezar un evento de mesa. myName / rivalName: nombres en línea.
 export var S = { mode: "menu", prev: null, diff: "medio", score: [0, 0], me: 0, base: 0, server: 0, timer: 0,
                  pending: null, wins: 0, losses: 0, guide: true, msg: null, online: false, fxMode: "off", lock: 0,
-                 orb: null, orbWait: 0 };
+                 orb: null, orbWait: 0, evWait: 0, myName: "", rivalName: "" };
 export var TABLE_ANIM = fx.TABLE_ANIM;
 export var B = { x: 0, y: 1, z: 1.45, vx: 0, vy: 0, vz: 0, hitter: 0, need: "opp", live: false };
 
@@ -77,7 +79,7 @@ function onBounce(s) {
 export function newGame() {
   S.score[0] = 0; S.score[1] = 0; S.pending = null;
   fx.clear();
-  S.orb = null; S.orbWait = ORB.FIRST;
+  S.orb = null; S.orbWait = ORB.FIRST; S.evWait = EVT.FIRST;
   S.base = 1 - S.base;
   out.overlay(null);
   startPoint();
@@ -89,6 +91,7 @@ function startPoint() {
   S.timer = 1.3;
   B.live = false; B.vx = B.vy = B.vz = 0; B.need = "opp";
   var ver = fx.FX.tableVer;
+  if (fx.allowedIn({ cat: "event" }, S.fxMode)) maybeEvent(S, giveEffect);   // quizá empieza un evento de mesa
   fx.onPoint();                      // entre puntos: caducan/empiezan los efectos que duran puntos
   S.lock = fx.FX.tableVer !== ver ? TABLE_ANIM : 0;   // si cambió la mesa, nadie saca hasta que acabe su animación
   PL.forEach(function (pl) { if (pl.ctrl === "ia") aiNewPoint(pl, S.diff); });

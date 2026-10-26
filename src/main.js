@@ -5,7 +5,7 @@ import * as fx from "./effects.js";
 import { isMuted, setMuted, playSound } from "./audio.js";
 import { initInput, pollInput } from "./input.js";
 import { createRenderer } from "./render.js";
-import { msgText, fxText } from "./texts.js";
+import { msgText, fxText, cleanName, validName } from "./texts.js";
 import * as online from "./online.js";
 import * as ui from "./ui.js";
 
@@ -18,6 +18,23 @@ out.hud = function () { ui.updateHUD(S); };
 out.overlay = function (kind, won) { if (kind) ui.showOverlay(kind, S, won); else ui.hideOverlay(); };
 out.sound = function (name, arg) { playSound(name, arg, S.me); online.onSound(name, arg); };
 out.notice = function (ev) { ui.toast(fxText(ev, S.me, PL[1 - S.me].ctrl === "ia")); };
+
+// Nombre de usuario recordado en este navegador (si el almacenamiento está bloqueado, simplemente no se recuerda).
+var NAME_KEY = "pinponnn.nombre";
+try { S.myName = cleanName(localStorage.getItem(NAME_KEY)); } catch (e) { S.myName = ""; }
+
+// Antes de crear sala o unirse hace falta un nombre válido; se guarda para la próxima vez.
+function needName() {
+  var raw = ui.nameValue();
+  if (raw !== null) S.myName = cleanName(raw);
+  if (!validName(S.myName)) {
+    ui.setOverlayNote("Escribe tu nombre (2 a 16 letras o números) para jugar en línea.");
+    var i = document.getElementById("nameIn"); if (i) i.focus();
+    return false;
+  }
+  try { localStorage.setItem(NAME_KEY, S.myName); } catch (e) { /* sin almacenamiento */ }
+  return true;
+}
 
 // Modo contra la máquina: este navegador controla al jugador 0 y la IA al jugador 1.
 setControls("local", "ia", 0);
@@ -49,13 +66,15 @@ function copyCode(btn) {
 }
 
 ui.onOverlayAction(function (a, v) {
+  // el menú se redibuja al cambiar dificultad o modo: conservar el nombre que se esté escribiendo
+  if (a === "diff" || a === "fxmode") { var raw = ui.nameValue(); if (raw !== null) S.myName = cleanName(raw); }
   if (a === "diff") setDiff(v);
   else if (a === "fxmode") setFxMode(v);
   else if (a === "start") newGame();
   else if (a === "resume") togglePause();
   else if (a === "menu") { if (online.getRole()) online.leave(); else toMenu(); }
-  else if (a === "host") online.startHost();
-  else if (a === "join") ui.showOverlay("join", S);
+  else if (a === "host") { if (needName()) online.startHost(); }
+  else if (a === "join") { if (needName()) ui.showOverlay("join", S); }
   else if (a === "joinGo") online.startGuest(ui.joinCodeValue());
   else if (a === "copy") copyCode(document.querySelector('#ov [data-a="copy"]'));
   else if (a === "rematch") online.rematch();

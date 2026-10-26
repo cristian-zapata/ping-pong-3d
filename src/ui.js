@@ -68,8 +68,10 @@ export function showOverlay(kind, S, extra) {
       '<div class="seg seg-wrap" role="radiogroup" aria-label="Efectos">' + fxSegs + "</div>" +
       (registeredIds().length ? "" : '<p class="hint fx-none">Todavía no hay efectos disponibles: llegan en la próxima versión.</p>') + "<br>" +
       '<button type="button" class="btn primary" data-a="start">Contra la máquina</button>' +
+      '<div class="seg-label name-label">Tu nombre (lo verá tu rival en línea)</div>' +
+      '<input class="name-in" id="nameIn" maxlength="16" autocomplete="nickname" spellcheck="false" aria-label="Tu nombre" placeholder="Escribe tu nombre">' +
       '<div class="row"><button type="button" class="btn ghost" data-a="host">Crear sala</button>' +
-      '<button type="button" class="btn ghost" data-a="join">Unirse a sala</button></div>' +
+      '<button type="button" class="btn ghost" data-a="join">Unirse a sala</button></div>' + RIVAL_WAIT +
       '<p class="hint">Coloca la paleta en el aro blanco y haz clic justo cuando llegue la pelota para pegar fuerte. Cuanto más fuerte pegues, más riesgo de fallar.</p></div>';
   } else if (kind === "pause") {
     html = '<div class="card"><h2>Pausa</h2><p>El juego espera.</p>' +
@@ -104,6 +106,7 @@ export function showOverlay(kind, S, extra) {
       '<button type="button" class="btn primary" data-a="menu">Volver al menú</button></div>';
   }
   ov.innerHTML = html;
+  if (kind === "menu") $("nameIn").value = S.myName || "";        // como propiedad, nunca dentro del HTML
   if (kind === "hosting") $("roomCode").textContent = extra;
   if (kind === "connecting") $("ovStatus").textContent = extra || "";
   if (kind === "neterror") { $("ovTitle").textContent = extra.title; $("ovStatus").textContent = extra.text; }
@@ -120,6 +123,9 @@ export function showOverlay(kind, S, extra) {
 // Nota bajo los botones del overlay actual (errores al unirse, aviso de revancha).
 export function setOverlayNote(t) { var n = $("ovNote"); if (n) n.textContent = t || ""; }
 export function joinCodeValue() { var i = $("codeIn"); return i ? i.value : ""; }
+export function nameValue() { var i = $("nameIn"); return i ? i.value : null; }
+// Nombre del rival en el marcador (en línea).
+export function setRivalName(name) { $("rivalName").textContent = name; }
 
 // fn(action, value) recibe el data-a y data-v del botón pulsado en el overlay.
 export function onOverlayAction(fn) {

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { P, predict } from "../src/physics.js";
 import { S, B, PL, out, tick, trySwing, newGame, setControls } from "../src/game.js";
-import { msgText } from "../src/texts.js";
+import { msgText, cleanName, validName, NAME_MAX } from "../src/texts.js";
 
 var STEP = 1 / 120;
 var realRandom = Math.random;
@@ -117,4 +117,17 @@ test("máquina contra máquina termina una partida válida", function () {
   assert.equal(S.mode, "over");
   var hi = Math.max(S.score[0], S.score[1]), lo = Math.min(S.score[0], S.score[1]);
   assert.ok(hi >= 11 && hi - lo >= 2, "marcador final " + S.score);
+});
+
+test("nombre de usuario: se limpia (sin HTML ni caracteres raros), se acorta y exige un mínimo", function () {
+  assert.equal(cleanName("  José   María "), "José María");
+  assert.equal(cleanName("ñandú_99-x.y"), "ñandú_99-x.y");
+  assert.equal(cleanName("<img src=x onerror=alert(1)>"), "img srcx onerror");
+  assert.ok(!/[<>"'&=()]/.test(cleanName("<b onclick=\"x()\">'&</b>")), "sin caracteres de HTML");
+  assert.equal(cleanName("\u0000\u202eabc\u0007"), "abc");
+  assert.equal(cleanName("NombreMuyLargoDeMasDe16").length, NAME_MAX);
+  assert.equal(cleanName(null), "");
+  assert.equal(cleanName(12345), "12345");
+  assert.ok(validName("Ana") && validName("Al"));
+  assert.ok(!validName("a") && !validName("   ") && !validName("😀😀") && !validName(undefined));
 });

@@ -61,6 +61,11 @@ export function allowedIn(def, mode) {
 
 export function list() { return active; }
 export function pendingList() { return pending; }
+// ¿Hay un efecto de mesa activo o esperando al siguiente punto?
+export function tableBusy() {
+  var isTable = function (e) { var d = getDef(e.id); return d && d.scope === "table"; };
+  return active.some(isTable) || pending.some(isTable);
+}
 
 // Activa un efecto. owner: 0 | 1 para efectos de jugador, -1 para globales y de mesa.
 // Los que duran puntos quedan pendientes hasta el siguiente punto. Devuelve "on", "pending" o null.
