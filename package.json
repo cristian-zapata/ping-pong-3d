@@ -1,0 +1,13 @@
+{
+  "name": "pinponnn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ping-pong 3D en el navegador (Three.js por CDN, sin build).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

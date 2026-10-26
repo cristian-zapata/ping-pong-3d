@@ -1,0 +1,55 @@
+# Corre los tests y, si pasan en `main`, publica el juego en GitHub Pages.
+# Requiere en el repo: Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+# Las acciones van fijadas a un commit (SHA) para que una etiqueta movida no cambie lo que se ejecuta;
+# el comentario indica la versión.
+name: Tests y despliegue a Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Por defecto el token solo puede leer el código.
+permissions:
+  contents: read
+
+# Un despliegue a la vez; no se cancela uno que ya está publicando.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - run: npm test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read     # leer el repo
+      pages: write       # publicar en Pages
+      id-token: write    # token OIDC que deploy-pages usa para probar que el despliegue viene de este repo
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      # Solo se publica lo que el navegador necesita (sin tests, package.json ni archivos de trabajo).
+      - name: Preparar _site
+        run: |
+          mkdir _site
+          cp -r index.html style.css src _site/
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site/
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

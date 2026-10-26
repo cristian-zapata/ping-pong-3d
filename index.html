@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ping-pong 3D contra la máquina</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 class="brand">Ping-pong 3D</h1>
+    <div class="score" aria-live="polite">
+      <div class="side"><span class="dot" id="srv0"></span>Tú <b id="sp">0</b></div>
+      <span class="sep">:</span>
+      <div class="side"><b id="sa">0</b> <span id="rivalName">Máquina</span><span class="dot" id="srv1"></span></div>
+    </div>
+    <div class="tools">
+      <span id="rec">Sesión: 0 – 0</span>
+      <span id="ping" hidden>Ping: –</span>
+      <button id="leave" type="button" hidden>Salir de la sala</button>
+      <button id="guide" type="button">Guía: sí</button>
+      <button id="mute" type="button">Sonido: sí</button>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl" aria-label="Mesa de ping-pong en 3D"></canvas>
+    <div class="msg" id="msg"></div>
+    <div class="ov" id="ov"></div>
+  </div>
+
+  <p class="foot">Mueve la paleta con el mouse (o con el dedo, WASD o las flechas). <b>Clic, toque o Espacio</b> = sacar y golpear fuerte. Si no golpeas, solo devuelves suave. El aro blanco (guía) muestra dónde llegará la pelota. P pausa (no en línea), M sonido, G guía.</p>
+</div>
+
+<!-- Three.js r128 como script clásico (define window.THREE) antes del módulo principal. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+        integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- PeerJS 1.5.5 (define window.Peer) para las salas en línea. Si no carga, el modo contra la máquina sigue funcionando. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"
+        integrity="sha512-XEKeWX+mI3Ov+tg2evDlVQFzVOIp4T8J3cNcCEPaEUGpxJV3eZaN8rHuvnFPvQpGJBHPmrozJDMpm2xcDvtmyQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
