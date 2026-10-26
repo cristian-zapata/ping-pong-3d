@@ -18,6 +18,22 @@ out.hud = function () { ui.updateHUD(S); };
 out.overlay = function (kind, won) { if (kind) ui.showOverlay(kind, S, won); else ui.hideOverlay(); };
 out.sound = function (name, arg) { playSound(name, arg, S.me); online.onSound(name, arg); };
 out.notice = function (ev) { ui.toast(fxText(ev, S.me, PL[1 - S.me].ctrl === "ia")); };
+// Eventos de animación (impacto de cañonazo): esta pantalla la reproduce y, si es el anfitrión, la reenvía.
+out.event = function (ev) { if (view) view.playEvent(ev); online.onEvent(ev); };
+
+// "Movimiento reducido": sin sacudida ni giro de cámara. Por defecto sigue la preferencia del sistema; se recuerda.
+var MOTION_KEY = "pinponnn.movimiento", reduced = false;
+try {
+  var savedMotion = localStorage.getItem(MOTION_KEY);
+  reduced = savedMotion ? savedMotion === "reducido" : !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+} catch (e) { reduced = false; }
+function toggleMotion() {
+  reduced = !reduced;
+  if (view) view.setReducedMotion(reduced);
+  ui.setMotionLabel(reduced);
+  try { localStorage.setItem(MOTION_KEY, reduced ? "reducido" : "normal"); } catch (e) { /* sin almacenamiento */ }
+}
+ui.setMotionLabel(reduced);
 
 // Nombre de usuario recordado en este navegador (si el almacenamiento está bloqueado, simplemente no se recuerda).
 var NAME_KEY = "pinponnn.nombre";
@@ -57,7 +73,7 @@ initInput({
   mute: toggleMute,
   guide: toggleGuide
 });
-ui.onToolbar({ mute: toggleMute, guide: toggleGuide, leave: online.leave });
+ui.onToolbar({ mute: toggleMute, guide: toggleGuide, leave: online.leave, motion: toggleMotion });
 
 function copyCode(btn) {
   var c = online.roomCode();
@@ -82,6 +98,7 @@ ui.onOverlayAction(function (a, v) {
 });
 
 view = createRenderer(canvas, stage);
+if (view) view.setReducedMotion(reduced);
 if (!view) {
   ui.showOverlay("error", S);
 } else {

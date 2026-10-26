@@ -16,6 +16,14 @@ export var BALANCE = {
   big: { reach: 1.5, secs: 8 },          // paleta grande: multiplica el alcance, durante tantos segundos
   fast: { shotTime: 0.7, hits: 1 },      // pelota rápida: factor del tiempo de vuelo, durante tantas devoluciones
   freeze: { speed: 0.6, secs: 3 },       // congelado: velocidad máxima de la paleta del rival en m/s, durante tantos s
+  cannon: {                              // cañonazo: su siguiente devolución va muy rápida al cuerpo del rival
+    hits: 1,              // devoluciones que dura
+    shotTime: 0.55,       // factor del tiempo de vuelo (se combina con la pelota rápida)
+    depth: 1.2,           // m desde la red donde bota en la mesa del rival (cerca del fondo, hacia su cuerpo)
+    bodyZ: 2.2,           // m desde la red: plano del cuerpo; si la pelota lo cruza sin ser devuelta, es impacto
+    bodyX: 0.55,          // el cuerpo está en x = 0.55 · x de su paleta (como lo dibuja render.js)
+    pause: 1.0            // s extra entre puntos tras un impacto, para que se vea la animación
+  },
   aiOrbAim: { facil: 0.3, medio: 0.5, dificil: 0.7 },   // probabilidad de que la máquina apunte a un orbe
 
   // ---------- Eventos de mesa ----------
@@ -29,5 +37,6 @@ export var BALANCE = {
     netHigh: 1.5,         // red alta: factor de la altura  (los saques dejan de pasar hacia 1.96; el test exige 20 % de margen)
     netLow: 0.5           // red baja: factor de la altura  (validado desde 0.4)
   },
-  tableAnim: 0.9          // s que dura la animación de cambio de mesa (y en los que no se puede sacar)
+  tableAnim: 0.9,         // s que dura la animación de cambio de mesa (y en los que no se puede sacar)
+  impactAnim: { fly: 0.8, lie: 0.8, rise: 0.6, shake: 0.7 }   // s de cada fase de la animación de impacto
 };

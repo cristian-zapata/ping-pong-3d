@@ -25,11 +25,13 @@
       <button id="leave" type="button" hidden>Salir de la sala</button>
       <button id="guide" type="button">Guía: sí</button>
       <button id="mute" type="button">Sonido: sí</button>
+      <button id="motion" type="button" title="Quita la sacudida y el giro de cámara">Movimiento: normal</button>
     </div>
   </header>
 
   <div class="stage" id="stage">
     <canvas id="gl" aria-label="Mesa de ping-pong en 3D"></canvas>
+    <div class="hit-flash" id="hitFlash" aria-hidden="true"></div>
     <div class="msg" id="msg"></div>
     <div class="toasts" id="toasts" aria-live="polite"></div>
     <div class="fxbar fx-all" id="fxAll" aria-label="Eventos de mesa"></div>

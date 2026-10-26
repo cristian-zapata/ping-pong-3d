@@ -2,7 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { P, DEFAULTS, resetParams, setParams, launchTo } from "../src/physics.js";
-import { checkServes, checkReturns } from "./sim.js";
+import { checkServes, checkReturns, checkCannon } from "./sim.js";
+import { BALANCE } from "../src/balance.js";
 import { POWERUPS } from "../src/powerups.js";
 import { PLAYER_DEFAULTS } from "../src/effects.js";
 import { EVENTS, NARROW, WIDE, NET_HIGH, NET_LOW, widthMod, netMod } from "../src/events.js";
@@ -49,7 +50,7 @@ function playerCombos() {
   for (mask = 0; mask < (1 << defs.length); mask++) {
     var pp = Object.assign({}, PLAYER_DEFAULTS), names = [];
     defs.forEach(function (d, k) { if (mask & (1 << k)) { d.mod(pp); names.push(d.id); } });
-    var key = JSON.stringify([pp.reachMul, pp.shotTime]);       // lo que afecta a la física de la pelota
+    var key = JSON.stringify([pp.reachMul, pp.shotTime, pp.cannon]);   // lo que afecta a la física de la pelota
     if (!out[key]) out[key] = { pp: pp, names: names.join("+") || "ninguno" };
   }
   return Object.keys(out).map(function (k) { return out[k]; });
@@ -165,4 +166,26 @@ test("todas las combinaciones permitidas: cada estado de la mesa por cada combin
   resetParams();
   t.diagnostic(tables.length + " estados de mesa x " + combos.length + " combinaciones de power-ups, " + total + " simulaciones");
   assert.deepEqual(bad, []);
+});
+
+test("cañonazo: con cada estado de mesa y cada combinación de power-ups cruza la red y bota en la mesa contraria", function (t) {
+  var C = BALANCE.cannon;
+  var tables = [{ name: "mesa normal", mods: [] }].concat(EVENTS.map(function (e) { return { name: e.name, mods: [e.mod] }; }));
+  var combos = playerCombos().filter(function (c) { return c.pp.cannon; }), bad = [], total = 0, body = 0;
+  assert.ok(combos.length >= 2, "combinaciones con cañonazo: " + combos.length);
+  tables.forEach(function (tb) {
+    combos.forEach(function (c) {
+      applyTable(tb.mods);
+      [1, -1].forEach(function (side) {
+        var r = checkCannon(side, P.REACH * c.pp.reachMul, c.pp.shotTime, C.depth, C.bodyZ, 0.6);
+        total += r.count; body += r.body;
+        if (r.failures.length) bad.push(tb.name + " + " + c.names + " lado " + side + ": " + r.failures.length + " " + JSON.stringify(r.failures[0]));
+      });
+    });
+  });
+  resetParams();
+  t.diagnostic(total + " cañonazos (" + combos.map(function (c) { return c.names; }).join(", ") + " x " + tables.length +
+    " mesas); sin devolverlos, " + (100 * body / total).toFixed(0) + " % llega al plano del cuerpo");
+  assert.deepEqual(bad, []);
+  assert.ok(body / total > 0.9, "la mayoría de los cañonazos no devueltos deben llegar al cuerpo");
 });

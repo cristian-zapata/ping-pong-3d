@@ -24,6 +24,11 @@ export function updateHUD(S) {
 
 export function setMuteLabel(muted) { $("mute").textContent = "Sonido: " + (muted ? "no" : "sí"); }
 export function setGuideLabel(on) { $("guide").textContent = "Guía: " + (on ? "sí" : "no"); }
+export function setMotionLabel(reduced) {
+  var b = $("motion");
+  b.textContent = "Movimiento: " + (reduced ? "reducido" : "normal");
+  b.setAttribute("aria-pressed", String(reduced));
+}
 
 // Modo en línea: nombre del rival, indicador de ping y botón para salir de la sala.
 export function setOnline(on) {
@@ -34,11 +39,12 @@ export function setOnline(on) {
 }
 export function setPing(ms) { $("ping").textContent = "Ping: " + (ms == null ? "–" : Math.round(ms) + " ms"); }
 
-// handlers: { mute(), guide(), leave() }
+// handlers: { mute(), guide(), leave(), motion() }
 export function onToolbar(handlers) {
   $("mute").addEventListener("click", function () { unlockAudio(); handlers.mute(); });
   $("guide").addEventListener("click", function () { handlers.guide(); });
   $("leave").addEventListener("click", function () { handlers.leave(); });
+  $("motion").addEventListener("click", function () { handlers.motion(); });
 }
 
 export function overlayOpen() { return !ov.hidden; }

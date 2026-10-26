@@ -1,6 +1,6 @@
 // Textos de los mensajes en pantalla. game.js genera descriptores (y viajan así en las snapshots),
 // y cada pantalla los convierte en texto desde el punto de vista de su jugador.
-// d: null | { k: "serve", s } | { k: "point", w, h, why: "net" | "out" | "own" | "miss" }
+// d: null | { k: "serve", s } | { k: "point", w, h, why: "net" | "out" | "own" | "miss" | "cannon" }
 import { getDef } from "./effects.js";
 
 // Nombre de usuario: se limpia al escribirlo y al recibirlo del rival (es un dato que llega de otro jugador).
@@ -20,6 +20,7 @@ export function msgText(d, me, rivalAI) {
   if (d.why === "net") why = mine ? "Tu pelota dio en la red" : R + " dio en la red";
   else if (d.why === "out") why = mine ? "Tu pelota se fue fuera" : R + " se pasó";
   else if (d.why === "own") why = mine ? "Tu pelota no botó donde debía" : R + " falló el bote";
+  else if (d.why === "cannon") why = mine ? "¡Cañonazo! Le diste a " + r : "¡" + R + " te dio un cañonazo!";
   else why = mine ? R + " no llegó" : "No llegaste a la pelota";   // miss
   return (d.w === me ? "Punto para ti · " : "Punto de " + r + " · ") + why;
 }

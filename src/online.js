@@ -7,6 +7,7 @@
 //                                fm: modo de efectos, fx: [[uid, id, dueño, restante], ...],   (solo el anfitrión activa efectos)
 //                                ob: orbe [tipo, x, y, z] o null }
 //                          ctl: { t:"ev", e, a }              sonidos
+//                          ctl: { t:"fxev", k:"impact", p }   evento de animación (impacto de cañonazo sobre el jugador p)
 //   ambos                  rt:  { t:"ping", ts } / { t:"pong", ts }
 //                          ctl: { t:"revancha" } · { t:"adios" } · { t:"nombre", n }  (nombre del jugador, se limpia al recibirlo)
 import * as net from "./net.js";
@@ -20,7 +21,7 @@ import { playSound } from "./audio.js";
 import * as ui from "./ui.js";
 
 var SNAP_DT = 1 / 30, INPUT_DT = 1 / 40, PING_DT = 1, TIMEOUT_MS = 6000, MAX_MSGS_PER_S = 150, STEP = 1 / 120;
-var MODES = ["serve", "play", "point", "over"], WHY = ["net", "out", "own", "miss"], SOUNDS = ["hit", "bounce", "net", "point", "orb"];
+var MODES = ["serve", "play", "point", "over"], WHY = ["net", "out", "own", "miss", "cannon"], SOUNDS = ["hit", "bounce", "net", "point", "orb", "impact"];
 
 var role = null;            // null | "host" | "guest"
 var gen = 0;                // sube en cada intento: descarta resultados de intentos cancelados
@@ -166,6 +167,9 @@ function onMessage(m) {
   }
   if (role === "host" && m.t === "in") hostInput(m);
   else if (role === "guest" && m.t === "st") guestSnapshot(m);
+  else if (role === "guest" && m.t === "fxev") {
+    if (m.k === "impact" && (m.p === 0 || m.p === 1)) out.event({ k: "impact", p: m.p });
+  }
   else if (role === "guest" && m.t === "ev") {
     if (SOUNDS.indexOf(m.e) !== -1) playSound(m.e, isNum(m.a) ? clamp(m.a, 0, 1) : 0, S.me);
   }
@@ -299,6 +303,11 @@ function sendSnapshot() {
     b: [r4(B.x), r4(B.y), r4(B.z), r4(B.vx), r4(B.vy), r4(B.vz), B.live ? 1 : 0, B.hitter],
     p: [r4(a.x), r4(a.y), r4(a.vx), r4(a.swing), r4(b.x), r4(b.y), r4(b.vx), r4(b.swing)]
   }, false);
+}
+
+// Eventos de animación del anfitrión: se reenvían al invitado, que la reproduce por su cuenta (no se envían cuadros).
+export function onEvent(ev) {
+  if (role === "host" && connected) net.enviar({ t: "fxev", k: ev.k, p: ev.p }, true);
 }
 
 // Sonidos del anfitrión: se reenvían al invitado por el canal fiable.

@@ -11,6 +11,9 @@ import { aiNewPoint, aiOnOpponentHit, aiShot, aiServeX, updateAI } from "./ai.js
 import * as fx from "./effects.js";
 import { ORB, orbStep, orbTouched } from "./powerups.js";
 import { EVT, maybeEvent } from "./events.js";
+import { BALANCE } from "./balance.js";
+
+var CANNON = BALANCE.cannon;
 
 // ---------- Estado ----------
 // me: índice del jugador que ve esta pantalla. msg: descriptor del mensaje actual (ver texts.js).
@@ -22,7 +25,8 @@ export var S = { mode: "menu", prev: null, diff: "medio", score: [0, 0], me: 0, 
                  pending: null, wins: 0, losses: 0, guide: true, msg: null, online: false, fxMode: "off", lock: 0,
                  orb: null, orbWait: 0, evWait: 0, myName: "", rivalName: "" };
 export var TABLE_ANIM = fx.TABLE_ANIM;
-export var B = { x: 0, y: 1, z: 1.45, vx: 0, vy: 0, vz: 0, hitter: 0, need: "opp", live: false };
+// cannon: la pelota en vuelo es un cañonazo (si cruza el plano del cuerpo del rival sin ser devuelta, es impacto).
+export var B = { x: 0, y: 1, z: 1.45, vx: 0, vy: 0, vz: 0, hitter: 0, need: "opp", live: false, cannon: false };
 
 function makePlayer(i, ctrl) {
   return { i: i, side: i === 0 ? 1 : -1, ctrl: ctrl,
@@ -35,7 +39,8 @@ export var out = {
   hud: function () {},        // hud()
   overlay: function () {},    // overlay(tipo, gano) · overlay(null) la oculta
   sound: function () {},      // sound("hit", potencia) · ("bounce") · ("net") · ("point", ganador) · ("orb")
-  notice: function () {}      // notice({ k: "fx-on" | "fx-off", id, o }) al empezar o terminar un efecto
+  notice: function () {},     // notice({ k: "fx-on" | "fx-off", id, o }) al empezar o terminar un efecto
+  event: function () {}       // event({ k: "impact", p: jugador impactado }) para las animaciones
 };
 fx.onNotice(function (ev) { out.notice(ev); });
 
@@ -52,7 +57,7 @@ function serverFor(total) {
   return (S.base + idx) % 2;
 }
 
-// w: ganador del punto; h: quien golpeó por última vez; why: "net" | "out" | "own" | "miss".
+// w: ganador del punto; h: quien golpeó por última vez; why: "net" | "out" | "own" | "miss" | "cannon".
 function pointTo(w, h, why) {
   if (S.mode !== "play") return;
   S.score[w]++;
@@ -60,12 +65,19 @@ function pointTo(w, h, why) {
   say({ k: "point", w: w, h: h, why: why });
   var p = S.score[0], a = S.score[1];
   S.pending = ((p >= 11 || a >= 11) && Math.abs(p - a) >= 2) ? "over" : null;
-  S.mode = "point"; S.timer = 1.7;
+  S.mode = "point"; S.timer = 1.7 + (why === "cannon" ? CANNON.pause : 0);
   B.live = false;
   out.hud();
 }
 function fault(h, kind) { pointTo(1 - h, h, kind); }
 function receiverMissed(h) { pointTo(h, h, "miss"); }
+// Cañonazo no devuelto que llega al cuerpo del rival: punto para quien disparó y evento para la animación.
+function cannonImpact(h) {
+  var victim = 1 - h;
+  pointTo(h, h, "cannon");
+  out.sound("impact", victim);
+  out.event({ k: "impact", p: victim });
+}
 
 // s: índice del jugador en cuyo lado botó. Devuelve true si el punto terminó con este bote.
 function onBounce(s) {
@@ -135,7 +147,7 @@ function launchBall(x, y, z, Tx, Tz, tDes, hitter) {
   var y0 = Math.max(y, P.HIT_YMIN);
   var v = launchTo(x, y0, z, Tx, Tz, tDes);
   B.x = x; B.y = y0; B.z = z; B.vx = v.vx; B.vy = v.vy; B.vz = v.vz;
-  B.hitter = hitter; B.need = "opp"; B.live = true;
+  B.hitter = hitter; B.need = "opp"; B.live = true; B.cannon = false;
 }
 
 // El jugador i devuelve la pelota que cruzó su plano de golpeo en (xx, yy).
@@ -152,7 +164,14 @@ function hit(i, xx, yy) {
     tx = s * (clamp(s * pl.vx * 0.16 + s * (xx - pl.x) * 3.5, -P.AIM_X, P.AIM_X) + rnd() * n);
     tz = s * (-(P.DEPTH_MIN + P.DEPTH_RANGE * power) + rnd() * n);
   }
+  if (fx.PP[i].cannon) {
+    // cañonazo: potencia máxima, apuntado a la x del cuerpo del rival y profundo en su mesa (bota y sigue hacia él)
+    power = 1;
+    tx = clamp(opp.x * CANNON.bodyX, -P.AIM_X, P.AIM_X);
+    tz = -s * CANNON.depth;
+  }
   launchBall(xx, yy, s * P.PZ, tx, tz, (P.T_BASE - P.T_POWER * power) * fx.PP[i].shotTime, i);
+  B.cannon = fx.PP[i].cannon;
   out.sound("hit", power);
   fx.onHit(i);
   if (opp.ctrl === "ia") aiOnOpponentHit(opp, S.diff);
@@ -166,7 +185,7 @@ function doServe(i) {
   var sv = serveVel(pl.side, x0, y0, bx);
   B.x = sv.x; B.y = sv.y; B.z = sv.z; B.vx = sv.vx; B.vy = sv.vy; B.vz = sv.vz;
   B.hitter = i;
-  B.need = "own"; B.live = true;
+  B.need = "own"; B.live = true; B.cannon = false;
   S.mode = "play";
   say(null);
   pl.swing = 0.25;
@@ -216,6 +235,8 @@ function stepBall(h) {
   if (b.need === "done") {
     var r = PL[1 - b.hitter], c = crossPlane(ox, oy, oz, b, r.side * P.PZ), reach = reachOf(r.i);
     if (c && Math.abs(c.x - r.x) <= reach && Math.abs(c.y - r.y) <= reach) { hit(r.i, c.x, c.y); return; }
+    // cañonazo que pasó la paleta sin ser devuelto: si llega al plano de su cuerpo, impacto
+    if (b.cannon && crossPlane(ox, oy, oz, b, r.side * CANNON.bodyZ)) { cannonImpact(b.hitter); return; }
   }
 
   if (isOut(b)) {

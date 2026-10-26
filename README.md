@@ -49,6 +49,13 @@ segundo) aparece un orbe flotando sobre la mesa durante 10 s. **Lo recoge quien 
 | 🏓 Paleta grande (verde) | Alcance de la paleta ×1.5 (la paleta y el aro guía se ven más grandes) | Quien lo recoge | 8 s |
 | ⚡ Pelota rápida (amarillo) | Su siguiente devolución tarda 0.7 de lo normal en llegar | Quien lo recoge | 1 golpe |
 | ❄ Congelado (azul) | La paleta del rival se mueve a 0.6 m/s como máximo y se tiñe de azul | El rival de quien lo recoge | 3 s |
+| 💥 Cañonazo (rojo) | Su siguiente devolución sale muy rápida (×0.55 del tiempo) y apuntada al cuerpo del rival. Si el rival no la devuelve y la pelota llega al plano de su cuerpo, es **impacto** y punto para quien disparó; si sale fuera o da en la red, falla como cualquier golpe | Quien lo recoge | 1 golpe |
+
+**Impacto de cañonazo:** el avatar del rival sale volando hacia atrás con una voltereta, cae, se queda un instante en
+el piso y se levanta antes del siguiente saque (la pausa entre puntos se alarga 1 s). Si el impactado eres tú, la cámara
+se sacude, gira un poco y destella, con sonido. El botón **"Movimiento: reducido"** quita la sacudida y el giro (por
+defecto sigue la preferencia del sistema operativo). La animación se calcula en cada pantalla a partir del evento
+(tipo y jugador); en línea el anfitrión decide el impacto y solo envía ese evento.
 
 La máquina también los recoge (según la dificultad, a veces apunta su devolución para que pase por el orbe) y los
 sufre igual que tú. La guía sigue siendo exacta: usa la misma física que la pelota.

@@ -2,6 +2,25 @@
 import { P, DEFAULTS, predict } from "./physics.js";
 import { PP, FX, TABLE_ANIM, getDef } from "./effects.js";
 import { ORB } from "./powerups.js";
+import { BALANCE } from "./balance.js";
+
+var IA = BALANCE.impactAnim;
+
+// Pose del avatar impactado a los u segundos del evento (función pura: cada pantalla la calcula sola).
+// En el marco del avatar (mira hacia la mesa, -z es "hacia atrás"): sale volando hacia atrás dando una voltereta,
+// cae tendido, se queda un instante y se levanta. Devuelve null cuando ya terminó.
+export function impactPose(u) {
+  var end = IA.fly + IA.lie + IA.rise;
+  if (u < 0 || u >= end) return null;
+  var smooth = function (f) { return f * f * (3 - 2 * f); };
+  if (u < IA.fly) {
+    var f = u / IA.fly;
+    return { z: -1.6 * f, y: 1.1 * Math.sin(Math.PI * f) + 0.22 * f, rx: -(2 * Math.PI + Math.PI / 2) * f };
+  }
+  if (u < IA.fly + IA.lie) return { z: -1.6, y: 0.22, rx: -Math.PI / 2 };
+  var g = smooth((u - IA.fly - IA.lie) / IA.rise);
+  return { z: -1.6 * (1 - g), y: 0.22 * (1 - g), rx: -Math.PI / 2 * (1 - g) };
+}
 import { clamp } from "./util.js";
 
 // Devuelve { render(S, B, PL, me), project(nx, ny, planeZ) } o null si no hay Three/WebGL.
@@ -128,11 +147,13 @@ export function createRenderer(canvas, stage) {
 
   // rival
   var rival = new THREE.Group();
-  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.62, 16), mat(0xffcc33)); torso.position.y = 1.0; rival.add(torso);
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 16), mat(0xf2c9a0)); head.position.y = 1.47; rival.add(head);
-  var cap = new THREE.Mesh(new THREE.SphereGeometry(0.175, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xd7263d)); cap.position.y = 1.5; rival.add(cap);
-  var legL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.7, 10), mat(0x2d3350)); legL.position.set(-0.1, 0.35, 0); rival.add(legL);
-  var legR = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.7, 10), mat(0x2d3350)); legR.position.set(0.1, 0.35, 0); rival.add(legR);
+  var body = new THREE.Group();          // el cuerpo, animable; la etiqueta del nombre cuelga de `rival`
+  rival.add(body);
+  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.62, 16), mat(0xffcc33)); torso.position.y = 1.0; body.add(torso);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 16), mat(0xf2c9a0)); head.position.y = 1.47; body.add(head);
+  var cap = new THREE.Mesh(new THREE.SphereGeometry(0.175, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xd7263d)); cap.position.y = 1.5; body.add(cap);
+  var legL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.7, 10), mat(0x2d3350)); legL.position.set(-0.1, 0.35, 0); body.add(legL);
+  var legR = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.7, 10), mat(0x2d3350)); legR.position.set(0.1, 0.35, 0); body.add(legR);
   rival.position.z = -2.4;
   world.add(rival);
 
@@ -177,6 +198,21 @@ export function createRenderer(canvas, stage) {
 
   function swingFactor(t) { return t > 0 ? Math.sin(Math.PI * (1 - t / 0.25)) : 0; }
 
+  // ---------- Eventos de animación ----------
+  // impact: { p: jugador impactado, t0: instante (s) en que esta pantalla recibió el evento }
+  var impact = null, reducedMotion = false;
+  var flashEl = document.getElementById("hitFlash");
+  var baseCamPos = camera.position.clone(), baseCamQ = camera.quaternion.clone();
+  function playEvent(ev) {
+    if (ev.k !== "impact") return;
+    impact = { p: ev.p, t0: performance.now() / 1000 };
+    if (ev.p === lastMe && flashEl) {                 // impacto sobre quien mira: destello
+      flashEl.classList.remove("on"); void flashEl.offsetWidth; flashEl.classList.add("on");
+    }
+  }
+  function setReducedMotion(on) { reducedMotion = !!on; }
+  var lastMe = 0;
+
   // Escala visual del alcance del jugador i (1 sin efectos): la paleta y el aro guía crecen con él.
   function reachScale(i) { return P.REACH * PP[i].reachMul / DEFAULTS.REACH; }
 
@@ -194,6 +230,7 @@ export function createRenderer(canvas, stage) {
   // PL: los dos jugadores; me: índice de quien mira esta pantalla.
   function render(S, B, PL, me) {
     var mine = PL[me], other = PL[1 - me];
+    lastMe = me;
     world.rotation.y = mine.side > 0 ? 0 : Math.PI;
 
     // mesa: si cambió su geometría, se reconstruye y destella brevemente (TABLE_ANIM; mientras, no se puede sacar)
@@ -224,6 +261,11 @@ export function createRenderer(canvas, stage) {
     var os = other.side;
     rival.position.set(other.x * 0.55, 0, os * 2.4);
     rival.rotation.y = os > 0 ? Math.PI : 0;
+    // impacto de cañonazo sobre el rival: su cuerpo vuela hacia atrás (en el marco del avatar, sirve en ambas vistas)
+    var pose = impact && impact.p === other.i ? impactPose(t - impact.t0) : null;
+    if (pose) { body.position.set(0, pose.y, pose.z); body.rotation.x = pose.rx; }
+    else if (body.rotation.x !== 0 || body.position.y !== 0 || body.position.z !== 0) { body.position.set(0, 0, 0); body.rotation.x = 0; }
+    arm.visible = !pose;
     setNameTag(S.online && S.rivalName && S.mode !== "menu" ? S.rivalName : "");
     link(arm, rival.position.x - os * 0.22, 1.2, rival.position.z - os * 0.05, other.x, other.y - 0.05, os * (P.PZ - sa * 0.28));
 
@@ -245,8 +287,18 @@ export function createRenderer(canvas, stage) {
     }
     ring.visible = showGuide;
 
-    // cámara
+    // cámara: si el impacto es sobre quien mira, sacudida y giro breve (no con "movimiento reducido").
+    // Se aplica solo para dibujar y se restaura, así la proyección del puntero no tiembla.
+    var u = impact && impact.p === me ? t - impact.t0 : -1, shaking = u >= 0 && u < IA.shake && !reducedMotion;
+    if (shaking) {
+      var k = 1 - u / IA.shake, amp = 0.07 * k * k;
+      camera.position.set(baseCamPos.x + amp * Math.sin(u * 53), baseCamPos.y + amp * Math.sin(u * 41 + 1), baseCamPos.z);
+      camera.quaternion.copy(baseCamQ);
+      camera.rotateZ(0.35 * Math.sin(Math.PI * u / IA.shake) * k);
+      camera.updateMatrixWorld();
+    }
     renderer.render(scene, camera);
+    if (shaking) { camera.position.copy(baseCamPos); camera.quaternion.copy(baseCamQ); camera.updateMatrixWorld(); }
   }
 
   // Punto donde el rayo de cámara por (nx, ny) [0..1 en el canvas] corta el plano z = planeZ, o null.
@@ -273,5 +325,5 @@ export function createRenderer(canvas, stage) {
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   resize();
 
-  return { render: render, project: project };
+  return { render: render, project: project, playEvent: playEvent, setReducedMotion: setReducedMotion };
 }

@@ -6,14 +6,14 @@ var STEP = 1 / 120;
 
 // Simula una pelota en juego y devuelve la lista de eventos hasta que cruza el plano de golpeo
 // del lado `recv` (+1 jugador 0, -1 rival), toca la red o se sale.
-export function simulate(b, recv) {
+export function simulate(b, recv, planeZ) {
   var ev = [], t = 0;
   while (t < 5) {
     var ox = b.x, oy = b.y, oz = b.z;
     integrate(b, STEP); t += STEP;
     if (hitsNet(ox, oy, oz, b)) { ev.push({ type: "net", t: t }); return ev; }
     if (onTable(b)) { bounceTable(b); ev.push({ type: "bounce", side: b.z > 0 ? 1 : -1, t: t, x: b.x, z: b.z }); }
-    var c = crossPlane(ox, oy, oz, b, recv * P.PZ);
+    var c = crossPlane(ox, oy, oz, b, recv * (planeZ || P.PZ));
     if (c) { ev.push({ type: "plane", t: t, x: c.x, y: c.y }); return ev; }
     if (isOut(b)) { ev.push({ type: "out", t: t }); return ev; }
   }
@@ -92,4 +92,28 @@ export function checkReturns(side, reach, shotTime, dens) {
     });
   });
   return { count: count, failures: failures };
+}
+
+// Cañonazos del lado `side` con los parámetros actuales: potencia máxima, apuntados a cualquier x de cuerpo dentro de
+// ±AIM_X y a `depth` de la red. Deben cruzar la red y botar primero en la mesa contraria (como cualquier devolución).
+// También cuenta cuántos, si nadie los devuelve, llegan al plano del cuerpo (bodyZ) por encima del suelo.
+export function checkCannon(side, reach, shotTime, depth, bodyZ, dens) {
+  var count = 0, failures = [], body = 0, z = reachZone(side, reach);
+  range(-z.x, z.x, n(15, dens)).forEach(function (x) {
+    range(z.y0, z.y1, n(12, dens)).forEach(function (y) {
+      range(-P.AIM_X, P.AIM_X, n(9, dens)).forEach(function (tx) {
+        count++;
+        var y0 = Math.max(y, P.HIT_YMIN), v = launchTo(x, y0, side * P.PZ, tx, -side * depth, (P.T_BASE - P.T_POWER) * shotTime);
+        var b = { x: x, y: y0, z: side * P.PZ, vx: v.vx, vy: v.vy, vz: v.vz }, opp = -side;
+        var ev = simulate({ x: b.x, y: b.y, z: b.z, vx: b.vx, vy: b.vy, vz: b.vz }, opp), first = ev[0];
+        if (!(first.type === "bounce" && first.side === opp && Math.abs(first.x) <= P.HW && Math.abs(first.z) <= P.HL)) {
+          failures.push({ x: x, y: y, tx: tx, ev: fmt(ev) });
+          return;
+        }
+        var far = simulate(b, opp, bodyZ), last = far[far.length - 1];
+        if (last.type === "plane") body++;
+      });
+    });
+  });
+  return { count: count, failures: failures, body: body };
 }

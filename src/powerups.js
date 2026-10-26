@@ -5,7 +5,7 @@ import { register } from "./effects.js";
 import { BALANCE } from "./balance.js";
 
 // Los números están en balance.js.
-var BIG = BALANCE.big, FAST = BALANCE.fast, FREEZE = BALANCE.freeze;
+var BIG = BALANCE.big, FAST = BALANCE.fast, FREEZE = BALANCE.freeze, CANNON = BALANCE.cannon;
 export var ORB = BALANCE.orb;
 export var FAST_SHOT = FAST.shotTime;
 
@@ -23,7 +23,11 @@ export var POWERUPS = [
   { id: "freeze", name: "Congelado", icon: "❄", color: "#38bdf8", cat: "powerup", scope: "player", unit: "seconds", n: FREEZE.secs,
     target: "rival", mod: function (pp) { pp.speedCap = Math.min(pp.speedCap, FREEZE.speed); },
     say: { on: ["¡{R} te congeló! Tu paleta va lenta " + FREEZE.secs + " s", "¡Congelaste a {r}!"],
-           off: ["Ya no estás congelado", "{R} se descongeló"] } }
+           off: ["Ya no estás congelado", "{R} se descongeló"] } },
+  { id: "cannon", name: "Cañonazo", icon: "💥", color: "#e11d48", cat: "powerup", scope: "player", unit: "hits", n: CANNON.hits,
+    target: "self", mod: function (pp) { pp.cannon = true; pp.shotTime *= CANNON.shotTime; },
+    say: { on: ["¡Cañonazo listo! Tu siguiente devolución va directo a {r}", "{R} tiene un cañonazo: ¡cuidado!"],
+           off: ["¡Fuego!", "¡Ahí viene el cañonazo!"] } }
 ];
 POWERUPS.forEach(register);
 var IDS = POWERUPS.map(function (d) { return d.id; });

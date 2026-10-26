@@ -5,7 +5,9 @@ import { P, predict, integrate, onTable, bounceTable, crossPlane, hitsNet } from
 import * as fx from "../src/effects.js";
 import { POWERUPS, ORB, FAST_SHOT, orbStep, orbTouched } from "../src/powerups.js";
 import { S, B, PL, out, tick, newGame, setControls, trySwing, reachOf } from "../src/game.js";
-import { fxText } from "../src/texts.js";
+import { fxText, msgText } from "../src/texts.js";
+import { BALANCE } from "../src/balance.js";
+import { impactPose } from "../src/render.js";
 
 var STEP = 1 / 120;
 var sounds = [], notices = [];
@@ -30,8 +32,8 @@ function reset(c0, c1, mode) {
   PL.forEach(function (pl) { Object.assign(pl, { tx: 0, ty: 1.05, x: 0, y: 1.05, vx: 0, swing: 0, cd: 0, err: 0, react: 0 }); });
 }
 
-test("los tres power-ups están registrados con icono, color, textos y destinatario", function () {
-  assert.deepEqual(POWERUPS.map(function (d) { return d.id; }), ["big", "fast", "freeze"]);
+test("los power-ups están registrados con icono, color, textos y destinatario", function () {
+  assert.deepEqual(POWERUPS.map(function (d) { return d.id; }), ["big", "fast", "freeze", "cannon"]);
   POWERUPS.forEach(function (d) {
     assert.equal(fx.getDef(d.id), d);
     assert.ok(d.icon && /^#[0-9a-f]{6}$/i.test(d.color) && d.name, d.id);
@@ -70,7 +72,7 @@ test("el orbe respeta el primer retraso, la vida, el tiempo mínimo entre orbes 
     assert.ok(o.y - ORB.R > P.NET_TOP - 0.2 && o.y > P.TOPY + ORB.R, "y " + o.y);
   });
   var kinds = {}; spawns.forEach(function (o) { kinds[o.kind] = (kinds[o.kind] || 0) + 1; });
-  assert.deepEqual(Object.keys(kinds).sort(), ["big", "fast", "freeze"]);
+  assert.deepEqual(Object.keys(kinds).sort(), ["big", "cannon", "fast", "freeze"]);
 });
 
 test("sin power-ups en el modo de partida no aparece ningún orbe (ni se consume azar)", function () {
@@ -240,4 +242,66 @@ test("la recogida no cambia nada si el anfitrión no permite power-ups (solo efe
   Object.assign(B, { x: 0, y: 1.1, z: 0.9, vx: 0, vy: 0, vz: -4, hitter: 0, need: "opp", live: true });
   for (var i = 0; i < 6; i++) tick(STEP);
   assert.equal(fx.list().length, 0, "giveEffect lo rechaza por el modo");
+});
+
+// Cañonazo del jugador 1 hacia el jugador 0. `ready`: el jugador 0 pone la paleta donde llegará la pelota.
+function cannonFrom1(ready) {
+  reset("local", "local", "all");
+  newGame();
+  var events = [], snd = [];
+  out.event = function (ev) { events.push(ev); };
+  out.sound = function (n, a) { snd.push(n + ":" + a); };
+  fx.apply("cannon", 1);
+  PL[0].x = PL[0].tx = 0.9; PL[0].y = PL[0].ty = 1.0;          // el cuerpo del jugador 0 está en x = 0.55 · 0.9
+  S.mode = "play";
+  Object.assign(B, { x: 0, y: 1.2, z: -P.PZ + 0.05, vx: 0, vy: 0, vz: -3, hitter: 0, need: "done", live: true });
+  for (var i = 0; i < 6 && B.hitter === 0; i++) tick(STEP);   // el jugador 1 devuelve: sale el cañonazo
+  assert.equal(B.hitter, 1, "el jugador 1 golpeó");
+  assert.equal(B.cannon, true, "la pelota va marcada como cañonazo");
+  assert.equal(fx.list().length, 0, "el efecto se consume al dispararlo");
+  for (i = 0; i < 120 * 3 && S.mode === "play"; i++) {
+    if (ready) {
+      var p = predict(B.x, B.y, B.z, B.vx, B.vy, B.vz, P.PZ);
+      if (p && B.vz > 0) { PL[0].tx = p.x; PL[0].ty = p.y; }
+    }
+    tick(STEP);
+    if (ready && B.hitter === 0) break;
+  }
+  out.event = function () {};
+  out.sound = function (n) { sounds.push(n); };
+  return { events: events, snd: snd };
+}
+
+test("cañonazo no devuelto: impacto, punto para quien disparó, evento de animación y pausa más larga", function () {
+  var r = cannonFrom1(false);
+  assert.equal(S.mode, "point");
+  assert.deepEqual(S.score, [0, 1]);
+  assert.equal(S.msg.why, "cannon");
+  assert.deepEqual(r.events, [{ k: "impact", p: 0 }]);
+  assert.ok(r.snd.indexOf("impact:0") !== -1, "sonido de impacto");
+  assert.ok(S.timer > 1.7 + BALANCE.cannon.pause - 0.05, "pausa alargada: " + S.timer.toFixed(2));
+  assert.equal(msgText(S.msg, 0, true), "Punto de la máquina · ¡La máquina te dio un cañonazo!");
+  assert.equal(msgText(S.msg, 1, false), "Punto para ti · ¡Cañonazo! Le diste a tu rival");
+  fx.clear();
+});
+
+test("cañonazo devuelto: no hay impacto y la pelota de vuelta ya no es cañonazo", function () {
+  var r = cannonFrom1(true);
+  assert.equal(B.hitter, 0, "el jugador 0 lo devolvió");
+  assert.equal(B.cannon, false);
+  assert.deepEqual(r.events, []);
+  fx.clear();
+});
+
+test("la animación de impacto es determinista: vuela, cae tendido, se levanta y termina en su sitio", function () {
+  var A = BALANCE.impactAnim, end = A.fly + A.lie + A.rise;
+  assert.deepEqual(impactPose(0.3), impactPose(0.3), "misma entrada, misma pose");
+  assert.equal(impactPose(-0.01), null);
+  assert.ok(impactPose(A.fly / 2).y > 0.5, "en el aire a media trayectoria");
+  var lying = impactPose(A.fly + A.lie / 2);
+  assert.ok(Math.abs(lying.rx + Math.PI / 2) < 1e-9 && lying.z < -1, "tendido detrás de su sitio");
+  var last = impactPose(end - 1e-6);
+  assert.ok(Math.abs(last.rx) < 1e-3 && Math.abs(last.z) < 1e-3 && Math.abs(last.y) < 1e-3, "de pie en su sitio");
+  assert.equal(impactPose(end), null);
+  assert.ok(end <= 1.7 + BALANCE.cannon.pause, "cabe en la pausa entre puntos");
 });

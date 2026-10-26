@@ -21,7 +21,8 @@ import { BALANCE } from "./balance.js";
 export var PLAYER_DEFAULTS = Object.freeze({
   reachMul: 1,          // multiplica P.REACH (alcance de la paleta)
   shotTime: 1,          // multiplica el tiempo de vuelo de sus devoluciones (< 1: más rápidas)
-  speedCap: Infinity    // velocidad máxima de su paleta en m/s
+  speedCap: Infinity,   // velocidad máxima de su paleta en m/s
+  cannon: false         // su siguiente devolución es un cañonazo (va al cuerpo del rival)
 });
 export var PP = [Object.assign({}, PLAYER_DEFAULTS), Object.assign({}, PLAYER_DEFAULTS)];
 
