@@ -206,6 +206,9 @@ y **solo si pasan** publica `index.html`, `style.css` y `src/` desde la rama `ma
 4. **Desplegar:** si el primer workflow corrió antes del paso 3, vuelve a lanzarlo en *Actions → Tests y despliegue a Pages → Run workflow*.
 5. El juego queda en `https://<usuario>.github.io/<repo>/` (la URL también aparece en el resumen del workflow).
 
+El workflow tiene tres jobs: `test`, `build` (prepara y sube el sitio) y `deploy` (solo publica). Si falla únicamente
+la publicación, basta con *Re-run failed jobs*: se repite `deploy` sin volver a subir el sitio.
+
 **Permisos del workflow:** por defecto el token solo lee el código (`contents: read`). Únicamente el job `deploy` pide
 `pages: write` (publicar) e `id-token: write` (token OIDC con el que `deploy-pages` demuestra que el despliegue viene
 de este repo). Los pull requests ejecutan los tests pero nunca despliegan. El entorno `github-pages` lo crea GitHub y, por
